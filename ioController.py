@@ -1,5 +1,6 @@
 # IO control program
-# D. Waine 3/06/20
+# Latest version here   https://github.com/LittleFrog1959/ioController
+# Credits here          https://github.com/LittleFrog1959/ioController/wiki/Credits
 
 import tkinter as tk
 from tkinter import font  as tkfont
@@ -17,7 +18,7 @@ from IOPi import IOPi
 oBoard = [0x20, 0x22, 0x24, 0x26]
 iBoard = [0x21, 0x23, 0x25, 0x27]
 
-# Create:
+# Global creates:
 # - A pair of lists containing the true state of the input or output pins
 #       iState and oState. Each element can have the following values;
 #           "null", "on", "off"
@@ -61,6 +62,11 @@ for board in range (0, len(iBoard)):
         oldiBtnText[board].append ('')
         iForce[board].append ('live')
         iName[board].append ('I' + str (board) + "," + str (pin))
+
+def log (message, level = 'debug'):
+    t = str (dt.datetime.now ())
+    m = t + " " + "{:<10}".format (level) + message
+    print (m)
 
 class sampleApp (tk.Tk):
     def __init__(self, *args, **kwargs):
@@ -110,7 +116,7 @@ class alarmPage (tk.Frame):
 
     def toggleLabel (self):
         self.labelx.after (1000, self.toggleLabel)
-        print (oName[0][0])
+        log (str (oName[0][0]))
         if (self.labelx.cget ('text') == "Page 1"):
             self.labelx.config (text = "Page 1 +")
         else:
@@ -225,7 +231,7 @@ class mainPage(tk.Frame):
                     self.controlClient.setblocking (0)
                     self.RxDControlBuffer = ""
                 else:
-                    print ("TCP control port connect error")
+                    log ("TCP control port connect error", level = 'alarm')
                     return
         # If we get this far, we have a client connected either for the first
         # time or just on a 10mS timer.  Try to grab some bytes
@@ -239,7 +245,7 @@ class mainPage(tk.Frame):
             else:
                 # This is a real error while waiting for incoming
                 # data
-                print ("TCP control port receive error " + e)
+                log ("TCP control port receive error " + e, level = 'alarm')
                 return
         else:
             # There was no error so either we got some bytes or
@@ -256,14 +262,14 @@ class mainPage(tk.Frame):
                 self.RxDControlBuffer = self.RxDControlBuffer + self.RxD.decode ()
                 EOLPosition = self.RxDControlBuffer.find ('\r\n')
                 if (EOLPosition == -1):
-                    print ('TCP control port input is not terminated correctly')
+                    log ('TCP control port input is not terminated correctly', level = 'alarm')
                 else:
                     # Process the command we've just received
                     self.tcpProcessControl (self.RxDControlBuffer[0:EOLPosition])
                     # Trim the command line off the begining of the buffer
                     self.RxDControlBuffer = self.RxDControlBuffer[EOLPosition + 2:]
                     if len (self.RxDControlBuffer) > 0:
-                        print ('TCP control port RxDBuffer is not empty!')
+                        log ('TCP control port RxDBuffer is not empty!')
 
     def tcpProcessControl (self, RxD):
         # Process the supplied command
@@ -304,7 +310,7 @@ class mainPage(tk.Frame):
                     self.tcpControlTimerLabel.config (bg = 'green')
                     self.RxDDataBuffer = ""
                 else:
-                    print ("TCP data port connect error")
+                    log ("TCP data port connect error", level = 'alarm')
                     return
         # If we get this far, we have a client connected either for the first
         # time or just on a 10mS timer.  Try to grab some bytes
@@ -318,7 +324,7 @@ class mainPage(tk.Frame):
             else:
                 # This is a real error while waiting for incoming
                 # data
-                print ("TCP data port receive error " + e)
+                log ("TCP data port receive error " + e, level = 'alarm')
                 return
         else:
             # There was no error so either we got some bytes or
@@ -335,14 +341,14 @@ class mainPage(tk.Frame):
                 self.RxDDataBuffer = self.RxDDataBuffer + self.RxD.decode ()
                 EOLPosition = self.RxDDataBuffer.find ('\r\n')
                 if (EOLPosition == -1):
-                    print ('TCP data port input is not terminated correctly')
+                    log ('TCP data port input is not terminated correctly', level = 'alarm')
                 else:
                     # Process the command we've just received
                     self.tcpProcessData (self.RxDDataBuffer[0:EOLPosition])
                     # Trim the command line off the begining of the buffer
                     self.RxDDataBuffer = self.RxDDataBuffer[EOLPosition + 2:]
                     if len (self.RxDDataBuffer) > 0:
-                        print ('TCP data port  RxDBuffer is not empty!')
+                        log ('TCP data port  RxDBuffer is not empty!')
 
     def tcpProcessData (self, RxD):
         # Process incoming data change commands
@@ -440,7 +446,7 @@ class mainPage(tk.Frame):
                 self.oBtn[bOput][pOput].config (activebackground = "#e9e9e9")
                 self.oBtn[bOput][pOput].config (highlightbackground = "#d9d9d9")
         else:
-            print ('Illegal oForce state')
+            log ('Illegal oForce state', level = 'alarm')
 
     def setInputPin (self, bOput, pOput):
         # This is very similar to the output case above but this does not actually force any
@@ -463,7 +469,7 @@ class mainPage(tk.Frame):
                 self.iBtn[bOput][pOput].config (activebackground = "#e9e9e9")
                 self.iBtn[bOput][pOput].config (highlightbackground = "#d9d9d9")
         else:
-            print ('Illegal iForce state')
+            log ('Illegal iForce state', level = 'alarm')
 
     def configPorts(self):
         # Set up the objects that will interface to the ABE driver and then set their
@@ -705,7 +711,7 @@ class mainPage(tk.Frame):
             self.outputPopUpMenu.entryconfigure (0, label = oName[b][p])
             self.outputPopUpMenu.post (x, y)
         except:
-            print ('Unknown error while trying to present output pop up menu')
+            log ('Unknown error while trying to present output pop up menu', level = 'alarm')
 
     def inputPopUpCallBack (self, b, p):
         # Given the current mouse location, fix the location that the menu will be placed
@@ -719,7 +725,7 @@ class mainPage(tk.Frame):
             self.inputPopUpMenu.entryconfigure (0, label = iName[b][p])
             self.inputPopUpMenu.post (x, y)
         except:
-            print ('Unknown error while trying to present input pop up menu')
+            log ('Unknown error while trying to present input pop up menu', level = 'alarm')
 
     def setOutputPinLive (self):
         oForce[self.popupBoard][self.popupPin] = 'live'
@@ -771,8 +777,8 @@ class mainPage(tk.Frame):
         return (iState[x][y] + '\n' + iForce[x][y] + '\n' + iName[x][y])
 
 def main ():
-    app = sampleApp ()
-    app.mainloop()
+    app = sampleApp ()                  # Set up the TK environment
+    app.mainloop()                      # and let it run...
 
 if __name__ == '__main__':
     main ()
