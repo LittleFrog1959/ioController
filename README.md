@@ -1,9 +1,9 @@
 # ioController
 Input/Output (IO) Controller based on RPi4 and AB Electronics PIO boards.
 
-Presents a TCP/IP socket server.  This interface can be used to exchange real time information on the state of the I/O.
+Presents a TCP/IP socket server to a Test Controller.  This interface can be used to exchange real time information on the state of the I/O.
 
-This project is a front end to another project which uses Robot Framework to provide an automated test environment for real time system testing.
+This project is a front end to another project which uses Robot Framework to provide an automated test environment for real time system testing (i.e. the Test Controller).
 
 You can find information about Robot Framework here https://robotframework.org/
 
@@ -23,4 +23,7 @@ The Test Controller has three pieces of functionality;
 1. Exchange information with the IO Controllers.
 1. Run an emulation of the "real world" in a number of scenarios
 1. Run RF which manages the tests and collects / presents results
+
+## Real time?
+Well no...  It's not real time...  The response of the system to I/O state changes is about 250mS which is not really real time is it?
 
