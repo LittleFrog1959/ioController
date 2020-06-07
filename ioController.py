@@ -63,10 +63,15 @@ for board in range (0, len(iBoard)):
         iForce[board].append ('live')
         iName[board].append ('I' + str (board) + "," + str (pin))
 
+# Very simple logging system.  Just formats the supplied message with a timestamp
+# and a level (which defaults to "debug").  Outputs the message to a TCP data client
+# if it's connected
 def log (message, level = 'debug'):
     t = str (dt.datetime.now ())
     m = t + " " + "{:<10}".format (level) + message
     print (m)
+#    if dataClient != None:
+#        dataClient.send (m + '\r\n')
 
 class sampleApp (tk.Tk):
     def __init__(self, *args, **kwargs):
