@@ -1,7 +1,6 @@
 # IO control program
 # Latest version here   https://github.com/LittleFrog1959/ioController
 # Credits here          https://github.com/LittleFrog1959/ioController/wiki/Credits
-# Test change 2
 
 import tkinter as tk
 from tkinter import font  as tkfont
@@ -70,9 +69,51 @@ for board in range (0, len(iBoard)):
 def log (message, level = 'debug'):
     t = str (dt.datetime.now ())
     m = t + " " + "{:<10}".format (level) + message
-    print (m)
-#    if dataClient != None:
-#        dataClient.send (m + '\r\n')
+
+#    # Print the message on the message screen
+#    messagePage.addMsg (1, m)
+#
+#    # Bump the messages printed counter and see if we need to delete the oldest one
+#    msgRows += 1
+#    if msgRows > 5:
+#        msgRows = 5
+#        messagePage.a.delete ('1.0', '2.0')
+
+    # Now send the message to the log file
+    logFileHandle.write (m)
+
+def initLog ():
+    # Open a file on the local drive to which we're going to send all the logging
+    # messages
+
+    # First we need to create a log directory if there's not one already
+    try:
+        os.mkdir ('logs')
+    except FileExistsError:
+        # We got an error because the logs directory already exists.  Now get the
+        # cut off for deleting the files
+        cutOff = dt.datetime.now () - dt.timedelta (minutes = 10)
+        # There is a directory so remove all the old log files
+        try:
+            # Work through ALL of the files in the logs directory
+            for filename in os.listdir ('logs'):
+                fullFilename = 'logs/' + filename
+                # Get the last modified date/time
+                fileTime = dt.datetime.fromtimestamp (os.stat (fullFilename).st_mtime)
+                # Delete the file if we should do
+                if cutOff > fileTime:
+                    os.remove (fullFilename)
+        except:
+            # There is a directory but for some reason, there's no log files
+            pass
+    except:
+        print ('Unknown error creating log directory')
+
+    # Construct the file name from the D-M-Y H:M:S part of the datetime and remove
+    # any spaces because it makes working with the resulting file name easier
+    f = str (dt.datetime.now ())[0:19].replace (' ', '_')
+    # Return the file handle while openning the log file
+    return open ('logs/' + f + '.log', 'w')
 
 class sampleApp (tk.Tk):
     def __init__(self, *args, **kwargs):
@@ -90,13 +131,17 @@ class sampleApp (tk.Tk):
         else:
             self.geometry ('1280x800')
 
+        # Counts the number of messages in the message text box
+        # to allow delete of oldest message
+        messageRows = 0
+
         container = tk.Frame (self)
         container.pack (side = 'top', fill = 'both', expand = True)
         container.grid_rowconfigure (0, weight = 1)
         container. grid_columnconfigure (0, weight = 1)
 
         self.frames = {}
-        for F in (mainPage, alarmPage, rowIOPage):
+        for F in (mainPage, messagePage, rowIOPage):
             page_name = F.__name__
             frame = F (parent = container, controller = self)
             self.frames [page_name] = frame
@@ -107,26 +152,21 @@ class sampleApp (tk.Tk):
         frame = self.frames [page_name]
         frame.tkraise ()
 
-class alarmPage (tk.Frame):
+class messagePage (tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
-        self.labelx = tk.Label(self, text="This is page 1")
-        self.labelx.pack(side="top", fill="x", pady=10)
 
-        self.labelx.after (1000, self.toggleLabel)
+        # Put up the message space
+        self.msgText = tk.Text (self)
+        self.msgText.pack ()
 
-        button = tk.Button(self, text="Go to the start page",
+        self.button = tk.Button(self, text="I/O",
                            command=lambda: controller.show_frame("mainPage"))
-        button.pack()
+        self.button.pack()
 
-    def toggleLabel (self):
-        self.labelx.after (1000, self.toggleLabel)
-        log (str (oName[0][0]))
-        if (self.labelx.cget ('text') == "Page 1"):
-            self.labelx.config (text = "Page 1 +")
-        else:
-            self.labelx.config (text = "Page 1")
+    def addMsg (self, m):
+        self.msgText.insert (tk.END, m + '\n')
 
 class rowIOPage(tk.Frame):
     def __init__(self, parent, controller):
@@ -668,10 +708,10 @@ class mainPage(tk.Frame):
                 self.iBtn[board][pin].grid(row = board + 7, column = pin + 1)
 
         # Create the buttons that allow movement to other pages
-        self.alarmBtn = tk.Button (self, text = "Alarms", anchor = 'w', justify = tk.LEFT,
+        self.messageBtn = tk.Button (self, text = "Messages", anchor = 'w', justify = tk.LEFT,
                             background = '#d9d9d9', activebackground = '#e9e9e9',
-                            command = lambda: self.controller.show_frame ('alarmPage'))
-        self.alarmBtn.grid (row = 12, column = 1, rowspan = 2)
+                            command = lambda: self.controller.show_frame ('messagePage'))
+        self.messageBtn.grid (row = 12, column = 1, rowspan = 2)
 
         self.rowIOBtn = tk.Button (self, text = "Row IO", anchor = 'w', justify = tk.LEFT,
                             background = '#d9d9d9', activebackground = '#e9e9e9',
@@ -783,6 +823,10 @@ class mainPage(tk.Frame):
         return (iState[x][y] + '\n' + iForce[x][y] + '\n' + iName[x][y])
 
 def main ():
+    # We have to do this because we need functions outside main to be able to 
+    # see it
+    global logFileHandle
+    logFileHandle = initLog ()          # Open up an output file to save log file entries
     app = sampleApp ()                  # Set up the TK environment
     app.mainloop()                      # and let it run...
 
