@@ -8,7 +8,7 @@ This project is a front end to another project which uses Robot Framework to pro
 ## Background
 A long time ago I used to work here; https://www.petards.com/ and even longer ago here https://www.appliedsoftware.co.uk/.  I worked on automated test systems and the development of harnesses which could be placed around development projects for the purposes of of proving functional correctness.
 
-It was a long time ago and the ideas that I had never really got followed through as much as I'd hoped...  So this project is a play-time & relearning project to see if I can get further this time.
+It was a long time ago and the ideas that I had never really got followed through as much as I'd hoped...  So this project is a play-time & relearning exercise to see if I can get further this time.
 
 ## Test Harness
 The complete system will feature the following elements;
