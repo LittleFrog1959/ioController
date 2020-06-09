@@ -20,16 +20,19 @@ iBoard = [0x21, 0x23, 0x25, 0x27]
 
 # Global creates:
 # - A pair of lists containing the true state of the input or output pins
-#       iState and oState. Each element can have the following values;
+#   iState and oState. Each element can have the following values;
 #           "null", "on", "off"
+#   The states on and off are populated by the code that interfaces to the
+#   ABE boards.  The state null is used to show that the field has not
+#   been populated with a legal state from the ABE driver.
 # - A pair of lists containing the old version of the 3 lines of text in
 #   each UI button.  This is used to detect changes of state as well as
 #   any forced state / name changes
 # - A pair of lists containing the forced state of pins
-#       iForce and oForce that can have the following values;
+#   iForce and oForce that can have the following values;
 #           "live", "forced on", "forced off"
 # - A pair of lists contained in the name of the pins
-#       iName and oName which are inititally set to a simple string
+#   iName and oName which are inititally set to a simple string
 #       of the form "[direction]button, pin"
 oState = []
 oldoBtnText = []
@@ -116,9 +119,14 @@ def initLog ():
     return open ('logs/' + f + '.log', 'w')
 
 class sampleApp (tk.Tk):
+    # This is the start of the main program that interfaces to the tk system.
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
 
+        # Read if we're connected to the touch screen (:0.0) or some other
+        # screen.  The touch screen uses all the screen space for our application
+        # and does not need the mouse.  Other screens don't do touch and so need
+        #the mouse to be working.
         try:
             displayReference = os.environ['DISPLAY']
         except:
@@ -135,6 +143,7 @@ class sampleApp (tk.Tk):
         # to allow delete of oldest message
         messageRows = 0
 
+        # Build the frame into which all the page definitions will fit
         container = tk.Frame (self)
         container.pack (side = 'top', fill = 'both', expand = True)
         container.grid_rowconfigure (0, weight = 1)
