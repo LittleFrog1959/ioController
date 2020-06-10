@@ -9,14 +9,18 @@ import socket
 import os
 import errno
 import datetime as dt
+import sys
 
 # The AB Electronics driver for the PIO board
 from IOPi import IOPi
 
-# A globally visable pair lists describing the I2C ports used by the
-# I/O boards
-oBoard = [0x20, 0x22, 0x24, 0x26]
-iBoard = [0x21, 0x23, 0x25, 0x27]
+# File containing constants used by this program
+import constants
+c = constants.constants ()
+
+# File containing globals used by this program
+import globals
+g = globals.globals ()
 
 # Global creates:
 # - A pair of lists containing the true state of the input or output pins
@@ -38,85 +42,118 @@ oState = []
 oldoBtnText = []
 oForce = []
 oName = []
-for board in range (0, len(oBoard)):
+for board in range (0, len(c.oBoard)):
     # Create a new row (which is the "board" axis)
     oState.append ([])
     oldoBtnText.append ([])
     oForce.append ([])
     oName.append ([])
     # Then populate each row with 16 values (for pin 0-15)
-    for pin in range (0, 16):
+    for pin in range (0, c.pinsPerBoard):
         oState[board].append ('null')
         oldoBtnText[board].append ('')
         oForce[board].append ('live')
-        oName[board].append ('O' + str (board) + "," + str (pin))
+        oName[board].append ('O' + str (board) + ',' + str (pin))
 
 iState = []
 oldiBtnText = []
 iForce = []
 iName = []
-for board in range (0, len(iBoard)):
+for board in range (0, len(c.iBoard)):
     iState.append ([])
     oldiBtnText.append ([])
     iForce.append ([])
     iName.append ([])
-    for pin in range (0, 16):
+    for pin in range (0, c.pinsPerBoard):
         iState[board].append ('null')
         oldiBtnText[board].append ('')
         iForce[board].append ('live')
-        iName[board].append ('I' + str (board) + "," + str (pin))
+        iName[board].append ('I' + str (board) + ',' + str (pin))
 
 # Very simple logging system.  Just formats the supplied message with a timestamp
 # and a level (which defaults to "debug").  Outputs the message to a TCP data client
 # if it's connected
 def log (message, level = 'debug'):
     t = str (dt.datetime.now ())
-    m = t + " " + "{:<10}".format (level) + message
+    m = t + ' ' + '{:<10}'.format (level) + message
 
 #    # Print the message on the message screen
 #    messagePage.addMsg (1, m)
 #
 #    # Bump the messages printed counter and see if we need to delete the oldest one
-#    msgRows += 1
+#    g.messageRows += 1
 #    if msgRows > 5:
 #        msgRows = 5
 #        messagePage.a.delete ('1.0', '2.0')
 
     # Now send the message to the log file
-    logFileHandle.write (m)
+    g.logFileHandle.write (m)
 
 def initLog ():
     # Open a file on the local drive to which we're going to send all the logging
-    # messages
+    # messages.  Note that errors here are printed (rather than logged) because
+    # the log file is not set up until we exit so printing is the least-worst
+    # thing to do
 
     # First we need to create a log directory if there's not one already
     try:
-        os.mkdir ('logs')
+        os.mkdir (c.logDirectory)
+        print ('Created log directory: ' + c.logDirectory)
+
     except FileExistsError:
-        # We got an error because the logs directory already exists.  Now get the
-        # cut off for deleting the files
-        cutOff = dt.datetime.now () - dt.timedelta (minutes = 10)
-        # There is a directory so remove all the old log files
+        # We got an error because the logs directory already exists.  Now we need
+        # to delete all the old log files.  Work out the cut off for deleting them
+        cutOff = dt.datetime.now () - dt.timedelta (minutes = c.logAge)
+
         try:
-            # Work through ALL of the files in the logs directory
-            for filename in os.listdir ('logs'):
-                fullFilename = 'logs/' + filename
+            # Work through ALL of the files in the logs directory.  This might be
+            # an error (maybe we should only look for old .log files)
+
+            for filename in os.listdir (c.logDirectory):
+                fullFilename = c.logDirectory + filename
                 # Get the last modified date/time
                 fileTime = dt.datetime.fromtimestamp (os.stat (fullFilename).st_mtime)
                 # Delete the file if we should do
+
                 if cutOff > fileTime:
                     os.remove (fullFilename)
-        except:
-            # There is a directory but for some reason, there's no log files
-            pass
-    except:
-        print ('Unknown error creating log directory')
+                    print ('Removed log file: ' + fullFilename)
+        except Exception as ex:
+            template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
+            message = template.format(type(ex).__name__, ex.args)
+            print ('Trying to delete old log files')
+            print (message)
+
+    except Exception as ex:
+        template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
+        message = template.format(type(ex).__name__, ex.args)
+        print ('Trying to make a log file directory')
+        print (message)
 
     # Construct the file name from the D-M-Y H:M:S part of the datetime and remove
     # any spaces because it makes working with the resulting file name easier
     f = str (dt.datetime.now ())[0:19].replace (' ', '_')
-    # Return the file handle while openning the log file
-    return open ('logs/' + f + '.log', 'w')
+
+    # Return the file handle while opening the log file
+    g.logFileHandle = open (c.logDirectory + f + c.logExtension, 'w')
+
+    # Create a symbolic link to this file so that it's easy to refer to the current
+    # log file for external programs (like tail -F) but first delete the existing
+    # symlink if we find it
+    try:
+        os.unlink (c.symbolicLogFilename)
+    except FileNotFoundError:
+        # Ignore this error as it's just that the program has never been run before
+        # and so there's no link file to unlink from
+        pass
+    except Exception as ex:
+        template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
+        message = template.format(type(ex).__name__, ex.args)
+        print ('Unknown error while unlinking symbolic log file')
+        print (message)
+
+    # Create the new link
+    os.symlink (c.logDirectory + f + c.logExtension, c.symbolicLogFilename)
 
 class sampleApp (tk.Tk):
     # This is the start of the main program that interfaces to the tk system.
@@ -129,19 +166,17 @@ class sampleApp (tk.Tk):
         #the mouse to be working.
         try:
             displayReference = os.environ['DISPLAY']
-        except:
-            displayReference = ""
+        except KeyError:
+            # Could not read DISPLAY value so just proceed with it set to something
+            displayReference = None
 
-        if (displayReference == ":0.0"):
-            self.geometry ('1280x800')
-            self.config (cursor = "none")
+        if (displayReference == ':0.0'):
+            # If we're running on the touch screen, then set some useful defaults
+            self.geometry (c.touchScreenResolution)
+            self.config (cursor = 'none')
             self.attributes('-fullscreen', True)
         else:
-            self.geometry ('1280x800')
-
-        # Counts the number of messages in the message text box
-        # to allow delete of oldest message
-        messageRows = 0
+            self.geometry (c.touchScreenResolution)
 
         # Build the frame into which all the page definitions will fit
         container = tk.Frame (self)
@@ -170,8 +205,8 @@ class messagePage (tk.Frame):
         self.msgText = tk.Text (self)
         self.msgText.pack ()
 
-        self.button = tk.Button(self, text="I/O",
-                           command=lambda: controller.show_frame("mainPage"))
+        self.button = tk.Button(self, text='I/O',
+                   command=lambda: controller.show_frame('mainPage'))
         self.button.pack()
 
     def addMsg (self, m):
@@ -181,10 +216,10 @@ class rowIOPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
-        label = tk.Label(self, text="This is page 2")
-        label.pack(side="top", fill="x", pady=10)
-        button = tk.Button(self, text="Go to the start page",
-                           command=lambda: controller.show_frame("mainPage"))
+        label = tk.Label(self, text='This is page 2')
+        label.pack(side='top', fill='x', pady=10)
+        button = tk.Button(self, text='Go to the start page',
+                           command=lambda: controller.show_frame('mainPage'))
         button.pack()
 
 class mainPage(tk.Frame):
@@ -222,7 +257,8 @@ class mainPage(tk.Frame):
         # Before we start on the actual TCP stuff, work out the IP address
         # of eth0 which we're going to use to connect to the other devices
         # in the system
-        IPAddress = os.popen ('ip addr show eth0').read().split ("inet ")[1].split ("/")[0]
+        IPAddress = os.popen ('ip addr show eth0').read().split ('inet ')[1].split ('/')[0]
+        log ('IO Controller IP Address: ' + IPAddress)
 
         # Create two servers that can handle just one client connection
         # at a time
@@ -233,8 +269,8 @@ class mainPage(tk.Frame):
         self.tcpData = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # Bind the connection to a port
-        self.tcpControl.bind ((IPAddress, 10000))
-        self.tcpData.bind ((IPAddress, 10001))
+        self.tcpControl.bind ((IPAddress, c.tcpControlPort))
+        self.tcpData.bind ((IPAddress, c.tcpDataPort))
 
         # Allow for the port to be re-used immediately
         self.tcpControl.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
@@ -254,7 +290,7 @@ class mainPage(tk.Frame):
 
     def createTCPTimers (self):
         # Set up the Control port periodic timer
-        self.tcpControlTimerLabel = tk.Label (self, text = "Control Client")
+        self.tcpControlTimerLabel = tk.Label (self, text = 'Control Client')
         self.tcpControlTimerLabel.grid (row = 11, column = 0)
         # Set up the client socket.  This is used as a crude state machine
         # when we service the TCP port every 10mS
@@ -262,7 +298,7 @@ class mainPage(tk.Frame):
         self.tcpControlTimerLabel.after (15, self.tcpControlTimer)
 
         # Repeat for the Data client
-        self.tcpDataTimerLabel = tk.Label (self, text = "Data Client")
+        self.tcpDataTimerLabel = tk.Label (self, text = 'Data Client')
         self.tcpDataTimerLabel.grid (row = 12, column = 0)
         self.dataClient = None
         self.tcpDataTimerLabel.after (10, self.tcpDataTimer)
@@ -284,9 +320,9 @@ class mainPage(tk.Frame):
                 if (self.controlClient != None):
                     self.tcpControlTimerLabel.config (bg = 'green')
                     self.controlClient.setblocking (0)
-                    self.RxDControlBuffer = ""
+                    self.RxDControlBuffer = ''
                 else:
-                    log ("TCP control port connect error", level = 'alarm')
+                    log ('TCP control port connect error', level = 'alarm')
                     return
         # If we get this far, we have a client connected either for the first
         # time or just on a 10mS timer.  Try to grab some bytes
@@ -300,7 +336,7 @@ class mainPage(tk.Frame):
             else:
                 # This is a real error while waiting for incoming
                 # data
-                log ("TCP control port receive error " + e, level = 'alarm')
+                log ('TCP control port receive error ' + e, level = 'alarm')
                 return
         else:
             # There was no error so either we got some bytes or
@@ -310,7 +346,7 @@ class mainPage(tk.Frame):
                 # code as such, we just need to zap the clientSocket
                 # so the correct code gets executed next time around
                 self.controlClient = None
-                self.tcpControlTimerLabel.config (bg = '#d9d9d9')
+                self.tcpControlTimerLabel.config (bg = c.normalGrey)
             else:
                 # Append the incoming bytes to the string (decode
                 # converts the bytes to a string)
@@ -333,14 +369,14 @@ class mainPage(tk.Frame):
             if args [1] == 'on':
                 self.toggleTest = True
                 self.toggleLabel.config (bg = 'green')
-#                self.controlClient.send (("test enabled\r\n").encode ())
+#                self.controlClient.send (('test enabled\r\n').encode ())
             elif args [1] == 'off':
                 self.toggleTest = False
-                self.toggleLabel.config (bg = '#d9d9d9')
-#                self.controlClient.send (("test disabled\r\n").encode ())
+                self.toggleLabel.config (bg = c.normalGrey)
+#                self.controlClient.send (('test disabled\r\n').encode ())
         elif args[0] == 'exec':
             # Use the full supplied string but remove the word "exec "
-            args = RxD[RxD.find (" "):].lstrip (" ")
+            args = RxD[RxD.find (' '):].lstrip (' ')
             exec (args)
             # Refresh the state of the button text in case something got updated
             self.updateInputs ()
@@ -362,10 +398,10 @@ class mainPage(tk.Frame):
                 # We got a new client connecting!!!
                 if (self.dataClient != None):
                     self.dataClient.setblocking (0)
-                    self.tcpControlTimerLabel.config (bg = 'green')
-                    self.RxDDataBuffer = ""
+                    self.tcpDataTimerLabel.config (bg = 'green')
+                    self.RxDDataBuffer = ''
                 else:
-                    log ("TCP data port connect error", level = 'alarm')
+                    log ('TCP data port connect error', level = 'alarm')
                     return
         # If we get this far, we have a client connected either for the first
         # time or just on a 10mS timer.  Try to grab some bytes
@@ -379,7 +415,7 @@ class mainPage(tk.Frame):
             else:
                 # This is a real error while waiting for incoming
                 # data
-                log ("TCP data port receive error " + e, level = 'alarm')
+                log ('TCP data port receive error ' + e, level = 'alarm')
                 return
         else:
             # There was no error so either we got some bytes or
@@ -389,7 +425,7 @@ class mainPage(tk.Frame):
                 # code as such, we just need to zap the clientSocket
                 # so the correct code gets executed next time around
                 self.dataClient = None
-                self.tcpControlTimerLabel.config (bg = 'green')
+                self.tcpDataTimerLabel.config (bg = c.normalGrey)
             else:
                 # Append the incoming bytes to the string (decode
                 # converts the bytes to a string)
@@ -421,7 +457,7 @@ class mainPage(tk.Frame):
             image = self.iObj[board].read_port (1) << 8
             image = image + self.iObj[board].read_port (0)
             # Now populate the global iState
-            for pin in range (0, 16):
+            for pin in range (0, c.pinsPerBoard):
                 if (pow (2, pin) & image) != 0:
                     iState[board][pin] = 'off'
                 else:
@@ -432,7 +468,7 @@ class mainPage(tk.Frame):
         for board in range (0, len (self.oObj)):
             image = self.oObj[board].read_port (1) << 8
             image = image + self.oObj[board].read_port (0)
-            for pin in range (0, 16):
+            for pin in range (0, c.pinsPerBoard):
                 if (pow (2, pin) & image) != 0:
                     oState[board][pin] = 'on'
                 else:
@@ -444,8 +480,8 @@ class mainPage(tk.Frame):
         # Set a flag indicating that at least one thing changed so we know if to do
         # an output to the TCP data client
         somethingChanged = False
-        for board in range (0, len (iBoard)):
-            for pin in range (0, 16):
+        for board in range (0, len (c.iBoard)):
+            for pin in range (0, c.pinsPerBoard):
                 # Figure out the current full button text
                 btnText = self.iText (board, pin)
                 # See if it's changed from the current value
@@ -463,8 +499,8 @@ class mainPage(tk.Frame):
     def updateOutputs (self):
         # Refresh the on-screen state of the outputs and also the actual output if required
         somethingChanged = False
-        for board in range (0, len (oBoard)):
-            for pin in range (0, 16):
+        for board in range (0, len (c.oBoard)):
+            for pin in range (0, c.pinsPerBoard):
                 btnText = self.oText (board, pin)
                 if (self.oBtn[board][pin].cget ('text') != btnText):
                     self.oBtn[board][pin].config (text = btnText)
@@ -481,25 +517,25 @@ class mainPage(tk.Frame):
         # Don't forget that the AB driver refers to pins starting from 1
         if (oForce[bOput][pOput] == 'force on'):
             self.oObj[bOput].write_pin (pOput + 1, 1)
-            self.oBtn[bOput][pOput].config (bg = "red3")
-            self.oBtn[bOput][pOput].config (activebackground = "red")
-            self.oBtn[bOput][pOput].config (highlightbackground = "blue")
+            self.oBtn[bOput][pOput].config (bg = 'red3')
+            self.oBtn[bOput][pOput].config (activebackground = 'red')
+            self.oBtn[bOput][pOput].config (highlightbackground = 'blue')
         elif (oForce[bOput][pOput] == 'force off'):
             self.oObj[bOput].write_pin (pOput + 1, 0)
-            self.oBtn[bOput][pOput].config (bg = "#d9d9d9")
-            self.oBtn[bOput][pOput].config (activebackground = "#e9e9e9")
-            self.oBtn[bOput][pOput].config (highlightbackground = "blue")
+            self.oBtn[bOput][pOput].config (bg = c.normalGrey)
+            self.oBtn[bOput][pOput].config (activebackground = c.brightGrey)
+            self.oBtn[bOput][pOput].config (highlightbackground = 'blue')
         elif (oForce[bOput][pOput] == 'live'):
             if (oState[bOput][pOput] == 'on'):
                 self.oObj[bOput].write_pin (pOput + 1, 1)
-                self.oBtn[bOput][pOput].config (bg = "red3")
-                self.oBtn[bOput][pOput].config (activebackground = "red")
-                self.oBtn[bOput][pOput].config (highlightbackground = "#d9d9d9")
+                self.oBtn[bOput][pOput].config (bg = 'red3')
+                self.oBtn[bOput][pOput].config (activebackground = 'red')
+                self.oBtn[bOput][pOput].config (highlightbackground = c.normalGrey)
             else:
                 self.oObj[bOput].write_pin (pOput + 1, 0)
-                self.oBtn[bOput][pOput].config (bg = "#d9d9d9")
-                self.oBtn[bOput][pOput].config (activebackground = "#e9e9e9")
-                self.oBtn[bOput][pOput].config (highlightbackground = "#d9d9d9")
+                self.oBtn[bOput][pOput].config (bg = c.normalGrey)
+                self.oBtn[bOput][pOput].config (activebackground = c.brightGrey)
+                self.oBtn[bOput][pOput].config (highlightbackground = c.normalGrey)
         else:
             log ('Illegal oForce state', level = 'alarm')
 
@@ -507,22 +543,22 @@ class mainPage(tk.Frame):
         # This is very similar to the output case above but this does not actually force any
         # hardware into a specific state.  It only updates the colours on the UI
         if (iForce[bOput][pOput] == 'force on'):
-            self.iBtn[bOput][pOput].config (bg = "red3")
-            self.iBtn[bOput][pOput].config (activebackground = "red")
-            self.iBtn[bOput][pOput].config (highlightbackground = "blue")
+            self.iBtn[bOput][pOput].config (bg = 'red3')
+            self.iBtn[bOput][pOput].config (activebackground = 'red')
+            self.iBtn[bOput][pOput].config (highlightbackground = 'blue')
         elif (iForce[bOput][pOput] == 'force off'):
-            self.iBtn[bOput][pOput].config (bg = "#d9d9d9")
-            self.iBtn[bOput][pOput].config (activebackground = "#e9e9e9")
-            self.iBtn[bOput][pOput].config (highlightbackground = "blue")
+            self.iBtn[bOput][pOput].config (bg = c.normalGrey)
+            self.iBtn[bOput][pOput].config (activebackground = c.brightGrey)
+            self.iBtn[bOput][pOput].config (highlightbackground = 'blue')
         elif (iForce[bOput][pOput] == 'live'):
             if (iState[bOput][pOput] == 'on'):
-                self.iBtn[bOput][pOput].config (bg = "red3")
-                self.iBtn[bOput][pOput].config (activebackground = "red")
-                self.iBtn[bOput][pOput].config (highlightbackground = "#d9d9d9")
+                self.iBtn[bOput][pOput].config (bg = 'red3')
+                self.iBtn[bOput][pOput].config (activebackground = 'red')
+                self.iBtn[bOput][pOput].config (highlightbackground = c.normalGrey)
             else:
-                self.iBtn[bOput][pOput].config (bg = "#d9d9d9")
-                self.iBtn[bOput][pOput].config (activebackground = "#e9e9e9")
-                self.iBtn[bOput][pOput].config (highlightbackground = "#d9d9d9")
+                self.iBtn[bOput][pOput].config (bg = c.normalGrey)
+                self.iBtn[bOput][pOput].config (activebackground = c.brightGrey)
+                self.iBtn[bOput][pOput].config (highlightbackground = c.normalGrey)
         else:
             log ('Illegal iForce state', level = 'alarm')
 
@@ -536,12 +572,12 @@ class mainPage(tk.Frame):
         iB = []
 
         # Let's do the inputs first
-        for port in iBoard:
+        for port in c.iBoard:
             # Append the port driver to the end of the port driver list
             iB = iB + [IOPi (port)]
 
         # Now let's set up the outputs
-        for port in oBoard:
+        for port in c.oBoard:
             oB = oB + [IOPi (port)]
 
         # Now we're going to set up all the input ports to have pull up
@@ -564,12 +600,12 @@ class mainPage(tk.Frame):
         # Initialise the timer.  For the moment, I create a little label top
         # left and hang the timer off that; I don't know how to create a
         # null widget
-        self.ioTimerLabel = tk.Label (self, text = "I/O Refresh")
+        self.ioTimerLabel = tk.Label (self, text = 'I/O Refresh')
         self.ioTimerLabel.grid (row = 13, column = 0)
         self.ioTimerLabel.after (1000, self.ioRefreshTimer)
 
         # Now create a timer which toggles the outputs
-        self.toggleLabel = tk.Label (self, text = "Toggle Test")
+        self.toggleLabel = tk.Label (self, text = 'Toggle Test')
         self.toggleLabel.grid (row = 14, column = 0)
         self.toggleLabel.after (2000, self.refreshToggle)
         self.toggleBoard = 0
@@ -586,7 +622,7 @@ class mainPage(tk.Frame):
         if self.ioRefreshState == 0:
             # Toggle the on-screen prompt so you know it's working
             if (self.ioTimerLabel.cget ('bg') == 'green'):
-                self.ioTimerLabel.config (bg = '#d9d9d9')
+                self.ioTimerLabel.config (bg = c.normalGrey)
             else:
                 self.ioTimerLabel.config (bg = 'green')
             self.readInputs ()
@@ -612,22 +648,22 @@ class mainPage(tk.Frame):
  #           if (self.controlClient != None) and (len(reason) > 0):
  #               self.controlClient.send ((str(dt.datetime.now ())[11:] + ' ' + reason + '\r\n').encode ())
             # Then send a digest of the state, force and name
-            self.dataClient.send (('iBoards = ' + str (len (iBoard)) + '\r\n').encode ())
-            self.dataClient.send (('oBoards = ' + str (len (oBoard)) + '\r\n').encode ())
+            self.dataClient.send (('iBoards = ' + str (len (c.iBoard)) + '\r\n').encode ())
+            self.dataClient.send (('oBoards = ' + str (len (c.oBoard)) + '\r\n').encode ())
 
             for board in range (0, len (oState)):
-                self.dataClient.send (('oState [' + str (board) + "] = " + str (oState[board]) + '\r\n').encode ())
+                self.dataClient.send (('oState [' + str (board) + '] = ' + str (oState[board]) + '\r\n').encode ())
             for board in range (0, len (oForce)):
-                self.dataClient.send (('oForce [' + str (board) + "] = " + str (oForce[board]) + '\r\n').encode ())
+                self.dataClient.send (('oForce [' + str (board) + '] = ' + str (oForce[board]) + '\r\n').encode ())
             for board in range (0, len (oName)):
-                self.dataClient.send (('oName [' + str (board) + "] = " + str (oName[board]) + '\r\n').encode ())
+                self.dataClient.send (('oName [' + str (board) + '] = ' + str (oName[board]) + '\r\n').encode ())
 
             for board in range (0, len (iState)):
-                self.dataClient.send (('iState [' + str (board) + "] = " + str (iState[board]) + '\r\n').encode ())
+                self.dataClient.send (('iState [' + str (board) + '] = ' + str (iState[board]) + '\r\n').encode ())
             for board in range (0, len (iForce)):
-                self.dataClient.send (('iForce [' + str (board) + "] = " + str (iForce[board]) + '\r\n').encode ())
+                self.dataClient.send (('iForce [' + str (board) + '] = ' + str (iForce[board]) + '\r\n').encode ())
             for board in range (0, len (iName)):
-                self.dataClient.send (('iName [' + str (board) + "] = " + str (iName[board]) + '\r\n').encode ())
+                self.dataClient.send (('iName [' + str (board) + '] = ' + str (iName[board]) + '\r\n').encode ())
 
     def refreshToggle (self):
         # Only keep the test running after this go if the test is still
@@ -639,110 +675,110 @@ class mainPage(tk.Frame):
             return
 
         # Toggle the state of the current output pin
-        if (oForce[self.toggleBoard][self.togglePin] == "live"):
-            oForce[self.toggleBoard][self.togglePin] = "force on"
+        if (oForce[self.toggleBoard][self.togglePin] == 'live'):
+            oForce[self.toggleBoard][self.togglePin] = 'force on'
         else:
-            oForce[self.toggleBoard][self.togglePin] = "live"
+            oForce[self.toggleBoard][self.togglePin] = 'live'
         # Update the on-screen outputs
         self.updateOutputs ()
 
         # Toggle the state of the current input pin
-        if (iForce[self.toggleBoard][self.togglePin] == "live"):
-            iForce[self.toggleBoard][self.togglePin] = "force on"
+        if (iForce[self.toggleBoard][self.togglePin] == 'live'):
+            iForce[self.toggleBoard][self.togglePin] = 'force on'
         else:
-            iForce[self.toggleBoard][self.togglePin] = "live"
+            iForce[self.toggleBoard][self.togglePin] = 'live'
         # Update the on-screen outputs
         self.updateInputs ()
 
         # Point at the next pin wrapping both the board and pin if required
         self.togglePin += 1
-        if (self.togglePin == 16):
+        if (self.togglePin == c.pinsPerBoard):
             self.togglePin = 0
             self.toggleBoard += 1
-            if (self.toggleBoard == len (oBoard)):
+            if (self.toggleBoard == len (c.oBoard)):
                 self.toggleBoard = 0
 
     def createWidgets(self):
         # Create an array of buttons with titles for both the rows and cols
         # First create the row/col titles
-        for board in range (0, len(oBoard)):
+        for board in range (0, len(c.oBoard)):
             self.lbl = tk.Label (self, text = 'OP ' + str (board))
             self.lbl.grid (row = board + 1, column = 0)
-            for pin in range (0, 16):
+            for pin in range (0, c.pinsPerBoard):
                 self.lbl = tk.Label (self, text = 'Pin ' + str (pin))
                 self.lbl.grid (row = 0, column = pin + 1)
 
         # Now create an list of lists containing the board/pin buttons for each
         # output
         self.oBtn = []
-        for board in range (0, len (oBoard)):
+        for board in range (0, len (c.oBoard)):
             # This is a blank list (which will contain a list of 16 items in a moment)
             self.oBtn.append ([])
-            for pin in range (0, 16):
+            for pin in range (0, c.pinsPerBoard):
                 # Add the new item.  I do this in two steps but this could be done without
                 # the = 0 below; I just thought it made it easier to read.
                 self.oBtn[board].append (0)
                 self.oBtn[board][pin] = tk.Button (self, height = 4, width = 5,
                             text = self.oText (board, pin), anchor = 'w', justify = tk.LEFT,
-                            background = "#d9d9d9", activebackground = "#e9e9e9",
+                            background = c.normalGrey, activebackground = c.brightGrey,
                             command = lambda x = board, y = pin: self.outputPopUpCallBack (x, y))
                 self.oBtn[board][pin].grid(row = board + 1, column = pin + 1)
 
         # Create a hard coded empty row which seperates the outputs and inputs
-        self.lbl = tk.Label (self, text = " ")
+        self.lbl = tk.Label (self, text = ' ')
         self.lbl.grid (row = 5, column = 0)
 
         # Now do the same for the input pins
-        for board in range (0, len(iBoard)):
+        for board in range (0, len(c.iBoard)):
             self.lbl = tk.Label (self, text = 'IP ' + str (board))
             self.lbl.grid (row = board + 7, column = 0)
-            for pin in range (0, 16):
+            for pin in range (0, c.pinsPerBoard):
                 self.lbl = tk.Label (self, text = 'Pin ' + str (pin))
                 self.lbl.grid (row = 6, column = pin + 1)
 
         # Now create an list of lists containing the board/pin buttons for each
         # input
         self.iBtn = []
-        for board in range (0, len (iBoard)):
+        for board in range (0, len (c.iBoard)):
             # This is a blank list (which will contain a list of 16 items in a moment)
             self.iBtn.append ([])
-            for pin in range (0, 16):
+            for pin in range (0, c.pinsPerBoard):
                 # Add the new item.  I do this in two steps but this could be done without
                 # the = 0 below; I just thought it made it easier to read.
                 self.iBtn[board].append (0)
                 self.iBtn[board][pin] = tk.Button (self, height = 4, width = 5,
                             text = self.iText (board, pin), anchor = 'w', justify = tk.LEFT,
-                            background = "#d9d9d9", activebackground = "#e9e9e9",
+                            background = c.normalGrey, activebackground = c.brightGrey,
                             command = lambda x = board, y = pin : self.inputPopUpCallBack (x, y))
                 self.iBtn[board][pin].grid(row = board + 7, column = pin + 1)
 
         # Create the buttons that allow movement to other pages
-        self.messageBtn = tk.Button (self, text = "Messages", anchor = 'w', justify = tk.LEFT,
-                            background = '#d9d9d9', activebackground = '#e9e9e9',
+        self.messageBtn = tk.Button (self, text = 'Messages', anchor = 'w', justify = tk.LEFT,
+                            background = c.normalGrey, activebackground = c.brightGrey,
                             command = lambda: self.controller.show_frame ('messagePage'))
         self.messageBtn.grid (row = 12, column = 1, rowspan = 2)
 
-        self.rowIOBtn = tk.Button (self, text = "Row IO", anchor = 'w', justify = tk.LEFT,
-                            background = '#d9d9d9', activebackground = '#e9e9e9',
+        self.rowIOBtn = tk.Button (self, text = 'Row IO', anchor = 'w', justify = tk.LEFT,
+                            background = c.normalGrey, activebackground = c.brightGrey,
                             command = lambda: self.controller.show_frame ('rowIOPage'))
         self.rowIOBtn.grid (row = 12, column = 3, rowspan =2)
 
         # Create a pop up menu to control the forced state of a selected pin
         self.outputPopUpMenu = tk.Menu (self, tearoff = 0)
         self.outputPopUpMenu.config (font = (None, 20))
-        self.outputPopUpMenu.add_command (label = "output")
+        self.outputPopUpMenu.add_command (label = 'output')
         self.outputPopUpMenu.entryconfigure (0, state = tk.DISABLED)
-        self.outputPopUpMenu.add_command (label = "live", command = self.setOutputPinLive)
-        self.outputPopUpMenu.add_command (label = "force on", command = self.setOutputPinForceOn)
-        self.outputPopUpMenu.add_command (label = "force off", command = self.setOutputPinForceOff)
+        self.outputPopUpMenu.add_command (label = 'live', command = self.setOutputPinLive)
+        self.outputPopUpMenu.add_command (label = 'force on', command = self.setOutputPinForceOn)
+        self.outputPopUpMenu.add_command (label = 'force off', command = self.setOutputPinForceOff)
 
         self.inputPopUpMenu = tk.Menu (self, tearoff = 0)
         self.inputPopUpMenu.config (font = (None, 20))
-        self.inputPopUpMenu.add_command (label = "input")
+        self.inputPopUpMenu.add_command (label = 'input')
         self.inputPopUpMenu.entryconfigure (0, state = tk.DISABLED)
-        self.inputPopUpMenu.add_command (label = "live", command = self.setInputPinLive)
-        self.inputPopUpMenu.add_command (label = "force on", command = self.setInputPinForceOn)
-        self.inputPopUpMenu.add_command (label = "force off", command = self.setInputPinForceOff)
+        self.inputPopUpMenu.add_command (label = 'live', command = self.setInputPinLive)
+        self.inputPopUpMenu.add_command (label = 'force on', command = self.setInputPinForceOn)
+        self.inputPopUpMenu.add_command (label = 'force off', command = self.setInputPinForceOff)
 
         # Make the left mouse button run the following routine
 #        self.bind ("<Button-1>", self.popup)
@@ -831,13 +867,15 @@ class mainPage(tk.Frame):
     def iText (self, x, y):
         return (iState[x][y] + '\n' + iForce[x][y] + '\n' + iName[x][y])
 
+def closeWindow ():
+    g.logFileHandle.close ()            # Shut down the logging system
+    sys.exit ()
+
 def main ():
-    # We have to do this because we need functions outside main to be able to 
-    # see it
-    global logFileHandle
-    logFileHandle = initLog ()          # Open up an output file to save log file entries
-    app = sampleApp ()                  # Set up the TK environment
-    app.mainloop()                      # and let it run...
+    initLog ()                                      # Open up an output file to save log file entries
+    app = sampleApp ()                              # Set up the TK environment
+    app.protocol ('WM_DELETE_WINDOW', closeWindow)  # Call this routine when someone exits the program
+    app.mainloop()                                  # and let it run...
 
 if __name__ == '__main__':
     main ()
