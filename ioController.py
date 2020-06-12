@@ -22,6 +22,10 @@ c = constants.constants ()
 import globals
 g = globals.globals ()
 
+# Set up the logging system
+import logging
+l = logging.log ()
+
 # Global creates:
 # - A pair of lists containing the true state of the input or output pins
 #   iState and oState. Each element can have the following values;
@@ -69,91 +73,6 @@ for board in range (0, len(c.iBoard)):
         oldiBtnText[board].append ('')
         iForce[board].append ('live')
         iName[board].append ('I' + str (board) + ',' + str (pin))
-
-# Very simple logging system.  Just formats the supplied message with a timestamp
-# and a level (which defaults to "debug").  Outputs the message to a TCP data client
-# if it's connected
-def log (message, level = 'debug'):
-    t = str (dt.datetime.now ())
-    m = t + ' ' + '{:<10}'.format (level) + message
-
-#    # Print the message on the message screen
-#    messagePage.addMsg (1, m)
-#
-#    # Bump the messages printed counter and see if we need to delete the oldest one
-#    g.messageRows += 1
-#    if msgRows > 5:
-#        msgRows = 5
-#        messagePage.a.delete ('1.0', '2.0')
-
-    # Now send the message to the log file
-    g.logFileHandle.write (m)
-
-def initLog ():
-    # Open a file on the local drive to which we're going to send all the logging
-    # messages.  Note that errors here are printed (rather than logged) because
-    # the log file is not set up until we exit so printing is the least-worst
-    # thing to do
-
-    # First we need to create a log directory if there's not one already
-    try:
-        os.mkdir (c.logDirectory)
-        print ('Created log directory: ' + c.logDirectory)
-
-    except FileExistsError:
-        # We got an error because the logs directory already exists.  Now we need
-        # to delete all the old log files.  Work out the cut off for deleting them
-        cutOff = dt.datetime.now () - dt.timedelta (minutes = c.logAge)
-
-        try:
-            # Work through ALL of the files in the logs directory.  This might be
-            # an error (maybe we should only look for old .log files)
-
-            for filename in os.listdir (c.logDirectory):
-                fullFilename = c.logDirectory + filename
-                # Get the last modified date/time
-                fileTime = dt.datetime.fromtimestamp (os.stat (fullFilename).st_mtime)
-                # Delete the file if we should do
-
-                if cutOff > fileTime:
-                    os.remove (fullFilename)
-                    print ('Removed log file: ' + fullFilename)
-        except Exception as ex:
-            template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
-            message = template.format(type(ex).__name__, ex.args)
-            print ('Trying to delete old log files')
-            print (message)
-
-    except Exception as ex:
-        template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
-        message = template.format(type(ex).__name__, ex.args)
-        print ('Trying to make a log file directory')
-        print (message)
-
-    # Construct the file name from the D-M-Y H:M:S part of the datetime and remove
-    # any spaces because it makes working with the resulting file name easier
-    f = str (dt.datetime.now ())[0:19].replace (' ', '_')
-
-    # Return the file handle while opening the log file
-    g.logFileHandle = open (c.logDirectory + f + c.logExtension, 'w')
-
-    # Create a symbolic link to this file so that it's easy to refer to the current
-    # log file for external programs (like tail -F) but first delete the existing
-    # symlink if we find it
-    try:
-        os.unlink (c.symbolicLogFilename)
-    except FileNotFoundError:
-        # Ignore this error as it's just that the program has never been run before
-        # and so there's no link file to unlink from
-        pass
-    except Exception as ex:
-        template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
-        message = template.format(type(ex).__name__, ex.args)
-        print ('Unknown error while unlinking symbolic log file')
-        print (message)
-
-    # Create the new link
-    os.symlink (c.logDirectory + f + c.logExtension, c.symbolicLogFilename)
 
 class sampleApp (tk.Tk):
     # This is the start of the main program that interfaces to the tk system.
@@ -209,8 +128,14 @@ class messagePage (tk.Frame):
                    command=lambda: controller.show_frame('mainPage'))
         self.button.pack()
 
+        self.msgText.after (1000, self.addMsgTest)
+
     def addMsg (self, m):
         self.msgText.insert (tk.END, m + '\n')
+
+    def addMsgTest (self):
+        self.msgText.after (1000, self.addMsgTest)
+        self.addMsg ("Hello")
 
 class rowIOPage(tk.Frame):
     def __init__(self, parent, controller):
@@ -258,7 +183,7 @@ class mainPage(tk.Frame):
         # of eth0 which we're going to use to connect to the other devices
         # in the system
         IPAddress = os.popen ('ip addr show eth0').read().split ('inet ')[1].split ('/')[0]
-        log ('IO Controller IP Address: ' + IPAddress)
+        l.logMsg ('IO Controller IP Address: ' + IPAddress)
 
         # Create two servers that can handle just one client connection
         # at a time
@@ -322,7 +247,7 @@ class mainPage(tk.Frame):
                     self.controlClient.setblocking (0)
                     self.RxDControlBuffer = ''
                 else:
-                    log ('TCP control port connect error', level = 'alarm')
+                    l.logMsg ('TCP control port connect error', level = 'alarm')
                     return
         # If we get this far, we have a client connected either for the first
         # time or just on a 10mS timer.  Try to grab some bytes
@@ -336,7 +261,7 @@ class mainPage(tk.Frame):
             else:
                 # This is a real error while waiting for incoming
                 # data
-                log ('TCP control port receive error ' + e, level = 'alarm')
+                l.logMsg ('TCP control port receive error ' + e, level = 'alarm')
                 return
         else:
             # There was no error so either we got some bytes or
@@ -353,14 +278,14 @@ class mainPage(tk.Frame):
                 self.RxDControlBuffer = self.RxDControlBuffer + self.RxD.decode ()
                 EOLPosition = self.RxDControlBuffer.find ('\r\n')
                 if (EOLPosition == -1):
-                    log ('TCP control port input is not terminated correctly', level = 'alarm')
+                    l.logMsg ('TCP control port input is not terminated correctly', level = 'alarm')
                 else:
                     # Process the command we've just received
                     self.tcpProcessControl (self.RxDControlBuffer[0:EOLPosition])
                     # Trim the command line off the begining of the buffer
                     self.RxDControlBuffer = self.RxDControlBuffer[EOLPosition + 2:]
                     if len (self.RxDControlBuffer) > 0:
-                        log ('TCP control port RxDBuffer is not empty!')
+                        l.logMsg ('TCP control port RxDBuffer is not empty!')
 
     def tcpProcessControl (self, RxD):
         # Process the supplied command
@@ -401,7 +326,7 @@ class mainPage(tk.Frame):
                     self.tcpDataTimerLabel.config (bg = 'green')
                     self.RxDDataBuffer = ''
                 else:
-                    log ('TCP data port connect error', level = 'alarm')
+                    l.logMsg ('TCP data port connect error', level = 'alarm')
                     return
         # If we get this far, we have a client connected either for the first
         # time or just on a 10mS timer.  Try to grab some bytes
@@ -415,7 +340,7 @@ class mainPage(tk.Frame):
             else:
                 # This is a real error while waiting for incoming
                 # data
-                log ('TCP data port receive error ' + e, level = 'alarm')
+                l.logMsg ('TCP data port receive error ' + e, level = 'alarm')
                 return
         else:
             # There was no error so either we got some bytes or
@@ -432,14 +357,14 @@ class mainPage(tk.Frame):
                 self.RxDDataBuffer = self.RxDDataBuffer + self.RxD.decode ()
                 EOLPosition = self.RxDDataBuffer.find ('\r\n')
                 if (EOLPosition == -1):
-                    log ('TCP data port input is not terminated correctly', level = 'alarm')
+                    l.logMsg ('TCP data port input is not terminated correctly', level = 'alarm')
                 else:
                     # Process the command we've just received
                     self.tcpProcessData (self.RxDDataBuffer[0:EOLPosition])
                     # Trim the command line off the begining of the buffer
                     self.RxDDataBuffer = self.RxDDataBuffer[EOLPosition + 2:]
                     if len (self.RxDDataBuffer) > 0:
-                        log ('TCP data port  RxDBuffer is not empty!')
+                        l.logMsg ('TCP data port  RxDBuffer is not empty!')
 
     def tcpProcessData (self, RxD):
         # Process incoming data change commands
@@ -537,7 +462,7 @@ class mainPage(tk.Frame):
                 self.oBtn[bOput][pOput].config (activebackground = c.brightGrey)
                 self.oBtn[bOput][pOput].config (highlightbackground = c.normalGrey)
         else:
-            log ('Illegal oForce state', level = 'alarm')
+            l.logMsg ('Illegal oForce state', level = 'alarm')
 
     def setInputPin (self, bOput, pOput):
         # This is very similar to the output case above but this does not actually force any
@@ -560,7 +485,7 @@ class mainPage(tk.Frame):
                 self.iBtn[bOput][pOput].config (activebackground = c.brightGrey)
                 self.iBtn[bOput][pOput].config (highlightbackground = c.normalGrey)
         else:
-            log ('Illegal iForce state', level = 'alarm')
+            l.logMsg ('Illegal iForce state', level = 'alarm')
 
     def configPorts(self):
         # Set up the objects that will interface to the ABE driver and then set their
@@ -802,7 +727,7 @@ class mainPage(tk.Frame):
             self.outputPopUpMenu.entryconfigure (0, label = oName[b][p])
             self.outputPopUpMenu.post (x, y)
         except:
-            log ('Unknown error while trying to present output pop up menu', level = 'alarm')
+            l.logMsg ('Unknown error while trying to present output pop up menu', level = 'alarm')
 
     def inputPopUpCallBack (self, b, p):
         # Given the current mouse location, fix the location that the menu will be placed
@@ -816,7 +741,7 @@ class mainPage(tk.Frame):
             self.inputPopUpMenu.entryconfigure (0, label = iName[b][p])
             self.inputPopUpMenu.post (x, y)
         except:
-            log ('Unknown error while trying to present input pop up menu', level = 'alarm')
+            l.logMsg ('Unknown error while trying to present input pop up menu', level = 'alarm')
 
     def setOutputPinLive (self):
         oForce[self.popupBoard][self.popupPin] = 'live'
@@ -868,11 +793,11 @@ class mainPage(tk.Frame):
         return (iState[x][y] + '\n' + iForce[x][y] + '\n' + iName[x][y])
 
 def closeWindow ():
-    g.logFileHandle.close ()            # Shut down the logging system
+    l.logClose ()
     sys.exit ()
 
 def main ():
-    initLog ()                                      # Open up an output file to save log file entries
+#    initl.logMsg ()                                      # Open up an output file to save log file entries
     app = sampleApp ()                              # Set up the TK environment
     app.protocol ('WM_DELETE_WINDOW', closeWindow)  # Call this routine when someone exits the program
     app.mainloop()                                  # and let it run...
