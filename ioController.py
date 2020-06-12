@@ -26,54 +26,6 @@ g = globals.globals ()
 import logging
 l = logging.log ()
 
-# Global creates:
-# - A pair of lists containing the true state of the input or output pins
-#   iState and oState. Each element can have the following values;
-#           "null", "on", "off"
-#   The states on and off are populated by the code that interfaces to the
-#   ABE boards.  The state null is used to show that the field has not
-#   been populated with a legal state from the ABE driver.
-# - A pair of lists containing the old version of the 3 lines of text in
-#   each UI button.  This is used to detect changes of state as well as
-#   any forced state / name changes
-# - A pair of lists containing the forced state of pins
-#   iForce and oForce that can have the following values;
-#           "live", "forced on", "forced off"
-# - A pair of lists contained in the name of the pins
-#   iName and oName which are inititally set to a simple string
-#       of the form "[direction]button, pin"
-oState = []
-oldoBtnText = []
-oForce = []
-oName = []
-for board in range (0, len(c.oBoard)):
-    # Create a new row (which is the "board" axis)
-    oState.append ([])
-    oldoBtnText.append ([])
-    oForce.append ([])
-    oName.append ([])
-    # Then populate each row with 16 values (for pin 0-15)
-    for pin in range (0, c.pinsPerBoard):
-        oState[board].append ('null')
-        oldoBtnText[board].append ('')
-        oForce[board].append ('live')
-        oName[board].append ('O' + str (board) + ',' + str (pin))
-
-iState = []
-oldiBtnText = []
-iForce = []
-iName = []
-for board in range (0, len(c.iBoard)):
-    iState.append ([])
-    oldiBtnText.append ([])
-    iForce.append ([])
-    iName.append ([])
-    for pin in range (0, c.pinsPerBoard):
-        iState[board].append ('null')
-        oldiBtnText[board].append ('')
-        iForce[board].append ('live')
-        iName[board].append ('I' + str (board) + ',' + str (pin))
-
 class sampleApp (tk.Tk):
     # This is the start of the main program that interfaces to the tk system.
     def __init__(self, *args, **kwargs):
@@ -128,14 +80,14 @@ class messagePage (tk.Frame):
                    command=lambda: controller.show_frame('mainPage'))
         self.button.pack()
 
-        self.msgText.after (1000, self.addMsgTest)
+#        self.msgText.after (1000, self.addMsgTest)
 
     def addMsg (self, m):
         self.msgText.insert (tk.END, m + '\n')
 
-    def addMsgTest (self):
-        self.msgText.after (1000, self.addMsgTest)
-        self.addMsg ("Hello")
+#    def addMsgTest (self):
+#        self.msgText.after (1000, self.addMsgTest)
+#        self.addMsg ("Hello")
 
 class rowIOPage(tk.Frame):
     def __init__(self, parent, controller):
@@ -212,6 +164,14 @@ class mainPage(tk.Frame):
         # more than one connection.
         self.tcpControl.listen (1)
         self.tcpData.listen (1)
+
+    def tcpDataClose (self):
+        if self.dataClient != None:
+            self.dataClient.close ()
+
+    def tcpControlClose (self):
+        if self.controlClient != None:
+            self.controlClient.close ()
 
     def createTCPTimers (self):
         # Set up the Control port periodic timer
@@ -384,9 +344,9 @@ class mainPage(tk.Frame):
             # Now populate the global iState
             for pin in range (0, c.pinsPerBoard):
                 if (pow (2, pin) & image) != 0:
-                    iState[board][pin] = 'off'
+                    g.iState[board][pin] = 'off'
                 else:
-                    iState[board][pin] = 'on'
+                    g.iState[board][pin] = 'on'
 
     def readOutputs (self):
         # See notes on "readInputs" above. This does the same for the outputs
@@ -395,9 +355,9 @@ class mainPage(tk.Frame):
             image = image + self.oObj[board].read_port (0)
             for pin in range (0, c.pinsPerBoard):
                 if (pow (2, pin) & image) != 0:
-                    oState[board][pin] = 'on'
+                    g.oState[board][pin] = 'on'
                 else:
-                    oState[board][pin] = 'off'
+                    g.oState[board][pin] = 'off'
 
     def updateInputs (self):
         # Refresh the on-screen state of the inputs if we need to
@@ -413,7 +373,7 @@ class mainPage(tk.Frame):
                 if (self.iBtn[board][pin].cget ('text') != btnText):
                     # Update the button object
                     self.iBtn[board][pin].config (text = btnText)
-                    oldiBtnText[board][pin] = btnText
+                    g.oldiBtnText[board][pin] = btnText
                     # Set the state of the input pin...  This does not actually do anything
                     # apart from update the colours of the buttons on the UI
                     self.setInputPin (board, pin)
@@ -429,7 +389,7 @@ class mainPage(tk.Frame):
                 btnText = self.oText (board, pin)
                 if (self.oBtn[board][pin].cget ('text') != btnText):
                     self.oBtn[board][pin].config (text = btnText)
-                    oldoBtnText[board][pin] = btnText
+                    g.oldoBtnText[board][pin] = btnText
                     # Set the state of the output pin even though it might be the same
                     # (e.g. If the change in text was the pin name)
                     self.setOutputPin (board, pin)
@@ -440,18 +400,18 @@ class mainPage(tk.Frame):
     def setOutputPin (self, bOput, pOput):
         # Set the supplied board / pin (starting from zero) to the correct state
         # Don't forget that the AB driver refers to pins starting from 1
-        if (oForce[bOput][pOput] == 'force on'):
+        if (g.oForce[bOput][pOput] == 'force on'):
             self.oObj[bOput].write_pin (pOput + 1, 1)
             self.oBtn[bOput][pOput].config (bg = 'red3')
             self.oBtn[bOput][pOput].config (activebackground = 'red')
             self.oBtn[bOput][pOput].config (highlightbackground = 'blue')
-        elif (oForce[bOput][pOput] == 'force off'):
+        elif (g.oForce[bOput][pOput] == 'force off'):
             self.oObj[bOput].write_pin (pOput + 1, 0)
             self.oBtn[bOput][pOput].config (bg = c.normalGrey)
             self.oBtn[bOput][pOput].config (activebackground = c.brightGrey)
             self.oBtn[bOput][pOput].config (highlightbackground = 'blue')
-        elif (oForce[bOput][pOput] == 'live'):
-            if (oState[bOput][pOput] == 'on'):
+        elif (g.oForce[bOput][pOput] == 'live'):
+            if (g.oState[bOput][pOput] == 'on'):
                 self.oObj[bOput].write_pin (pOput + 1, 1)
                 self.oBtn[bOput][pOput].config (bg = 'red3')
                 self.oBtn[bOput][pOput].config (activebackground = 'red')
@@ -462,21 +422,21 @@ class mainPage(tk.Frame):
                 self.oBtn[bOput][pOput].config (activebackground = c.brightGrey)
                 self.oBtn[bOput][pOput].config (highlightbackground = c.normalGrey)
         else:
-            l.logMsg ('Illegal oForce state', level = 'alarm')
+            l.logMsg ('Illegal g.oForce state', level = 'alarm')
 
     def setInputPin (self, bOput, pOput):
         # This is very similar to the output case above but this does not actually force any
         # hardware into a specific state.  It only updates the colours on the UI
-        if (iForce[bOput][pOput] == 'force on'):
+        if (g.iForce[bOput][pOput] == 'force on'):
             self.iBtn[bOput][pOput].config (bg = 'red3')
             self.iBtn[bOput][pOput].config (activebackground = 'red')
             self.iBtn[bOput][pOput].config (highlightbackground = 'blue')
-        elif (iForce[bOput][pOput] == 'force off'):
+        elif (g.iForce[bOput][pOput] == 'force off'):
             self.iBtn[bOput][pOput].config (bg = c.normalGrey)
             self.iBtn[bOput][pOput].config (activebackground = c.brightGrey)
             self.iBtn[bOput][pOput].config (highlightbackground = 'blue')
-        elif (iForce[bOput][pOput] == 'live'):
-            if (iState[bOput][pOput] == 'on'):
+        elif (g.iForce[bOput][pOput] == 'live'):
+            if (g.iState[bOput][pOput] == 'on'):
                 self.iBtn[bOput][pOput].config (bg = 'red3')
                 self.iBtn[bOput][pOput].config (activebackground = 'red')
                 self.iBtn[bOput][pOput].config (highlightbackground = c.normalGrey)
@@ -485,7 +445,7 @@ class mainPage(tk.Frame):
                 self.iBtn[bOput][pOput].config (activebackground = c.brightGrey)
                 self.iBtn[bOput][pOput].config (highlightbackground = c.normalGrey)
         else:
-            l.logMsg ('Illegal iForce state', level = 'alarm')
+            l.logMsg ('Illegal g.iForce state', level = 'alarm')
 
     def configPorts(self):
         # Set up the objects that will interface to the ABE driver and then set their
@@ -545,6 +505,9 @@ class mainPage(tk.Frame):
         # This routine gets called 10 times a second!
         self.ioTimerLabel.after (100, self.ioRefreshTimer)
         if self.ioRefreshState == 0:
+
+            app.frames['messagePage'].addMsg (str (dt.datetime.now ()))
+ 
             # Toggle the on-screen prompt so you know it's working
             if (self.ioTimerLabel.cget ('bg') == 'green'):
                 self.ioTimerLabel.config (bg = c.normalGrey)
@@ -576,19 +539,19 @@ class mainPage(tk.Frame):
             self.dataClient.send (('iBoards = ' + str (len (c.iBoard)) + '\r\n').encode ())
             self.dataClient.send (('oBoards = ' + str (len (c.oBoard)) + '\r\n').encode ())
 
-            for board in range (0, len (oState)):
-                self.dataClient.send (('oState [' + str (board) + '] = ' + str (oState[board]) + '\r\n').encode ())
-            for board in range (0, len (oForce)):
-                self.dataClient.send (('oForce [' + str (board) + '] = ' + str (oForce[board]) + '\r\n').encode ())
-            for board in range (0, len (oName)):
-                self.dataClient.send (('oName [' + str (board) + '] = ' + str (oName[board]) + '\r\n').encode ())
+            for board in range (0, len (g.oState)):
+                self.dataClient.send (('g.oState [' + str (board) + '] = ' + str (g.oState[board]) + '\r\n').encode ())
+            for board in range (0, len (g.oForce)):
+                self.dataClient.send (('g.oForce [' + str (board) + '] = ' + str (g.oForce[board]) + '\r\n').encode ())
+            for board in range (0, len (g.oName)):
+                self.dataClient.send (('g.oName [' + str (board) + '] = ' + str (g.oName[board]) + '\r\n').encode ())
 
-            for board in range (0, len (iState)):
-                self.dataClient.send (('iState [' + str (board) + '] = ' + str (iState[board]) + '\r\n').encode ())
-            for board in range (0, len (iForce)):
-                self.dataClient.send (('iForce [' + str (board) + '] = ' + str (iForce[board]) + '\r\n').encode ())
-            for board in range (0, len (iName)):
-                self.dataClient.send (('iName [' + str (board) + '] = ' + str (iName[board]) + '\r\n').encode ())
+            for board in range (0, len (g.iState)):
+                self.dataClient.send (('g.iState [' + str (board) + '] = ' + str (g.iState[board]) + '\r\n').encode ())
+            for board in range (0, len (g.iForce)):
+                self.dataClient.send (('g.iForce [' + str (board) + '] = ' + str (g.iForce[board]) + '\r\n').encode ())
+            for board in range (0, len (g.iName)):
+                self.dataClient.send (('g.iName [' + str (board) + '] = ' + str (g.iName[board]) + '\r\n').encode ())
 
     def refreshToggle (self):
         # Only keep the test running after this go if the test is still
@@ -600,18 +563,18 @@ class mainPage(tk.Frame):
             return
 
         # Toggle the state of the current output pin
-        if (oForce[self.toggleBoard][self.togglePin] == 'live'):
-            oForce[self.toggleBoard][self.togglePin] = 'force on'
+        if (g.oForce[self.toggleBoard][self.togglePin] == 'live'):
+            g.oForce[self.toggleBoard][self.togglePin] = 'force on'
         else:
-            oForce[self.toggleBoard][self.togglePin] = 'live'
+            g.oForce[self.toggleBoard][self.togglePin] = 'live'
         # Update the on-screen outputs
         self.updateOutputs ()
 
         # Toggle the state of the current input pin
-        if (iForce[self.toggleBoard][self.togglePin] == 'live'):
-            iForce[self.toggleBoard][self.togglePin] = 'force on'
+        if (g.iForce[self.toggleBoard][self.togglePin] == 'live'):
+            g.iForce[self.toggleBoard][self.togglePin] = 'force on'
         else:
-            iForce[self.toggleBoard][self.togglePin] = 'live'
+            g.iForce[self.toggleBoard][self.togglePin] = 'live'
         # Update the on-screen outputs
         self.updateInputs ()
 
@@ -724,7 +687,7 @@ class mainPage(tk.Frame):
         try:
             # Fix the name of the menu to be the name of the pin we're trying to change state
             # on then display the menu
-            self.outputPopUpMenu.entryconfigure (0, label = oName[b][p])
+            self.outputPopUpMenu.entryconfigure (0, label = g.oName[b][p])
             self.outputPopUpMenu.post (x, y)
         except:
             l.logMsg ('Unknown error while trying to present output pop up menu', level = 'alarm')
@@ -738,38 +701,38 @@ class mainPage(tk.Frame):
         self.outputPopUpMenu.unpost ()
 
         try:
-            self.inputPopUpMenu.entryconfigure (0, label = iName[b][p])
+            self.inputPopUpMenu.entryconfigure (0, label = g.iName[b][p])
             self.inputPopUpMenu.post (x, y)
         except:
             l.logMsg ('Unknown error while trying to present input pop up menu', level = 'alarm')
 
     def setOutputPinLive (self):
-        oForce[self.popupBoard][self.popupPin] = 'live'
+        g.oForce[self.popupBoard][self.popupPin] = 'live'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
         self.updateOutputs ()
 
     def setOutputPinForceOn (self):
-        oForce[self.popupBoard][self.popupPin] = 'force on'
+        g.oForce[self.popupBoard][self.popupPin] = 'force on'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
         self.updateOutputs ()
 
     def setOutputPinForceOff (self):
-        oForce[self.popupBoard][self.popupPin] = 'force off'
+        g.oForce[self.popupBoard][self.popupPin] = 'force off'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
         self.updateOutputs ()
 
     def setInputPinLive (self):
-        iForce[self.popupBoard][self.popupPin] = 'live'
+        g.iForce[self.popupBoard][self.popupPin] = 'live'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
         self.updateInputs ()
 
     def setInputPinForceOn (self):
-        iForce[self.popupBoard][self.popupPin] = 'force on'
+        g.iForce[self.popupBoard][self.popupPin] = 'force on'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
         self.updateInputs ()
 
     def setInputPinForceOff (self):
-        iForce[self.popupBoard][self.popupPin] = 'force off'
+        g.iForce[self.popupBoard][self.popupPin] = 'force off'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
         self.updateInputs ()
 
@@ -787,17 +750,20 @@ class mainPage(tk.Frame):
         return x, y
 
     def oText (self, x, y):
-        return (oState[x][y] + '\n' + oForce[x][y] + '\n' + oName[x][y])
+        return (g.oState[x][y] + '\n' + g.oForce[x][y] + '\n' + g.oName[x][y])
 
     def iText (self, x, y):
-        return (iState[x][y] + '\n' + iForce[x][y] + '\n' + iName[x][y])
+        return (g.iState[x][y] + '\n' + g.iForce[x][y] + '\n' + g.iName[x][y])
 
 def closeWindow ():
-    l.logClose ()
-    sys.exit ()
+    # Close down the program
+    l.logClose ()                                   # Close the log file
+    app.frames['mainPage'].tcpDataClose ()          # Disconnect and TCP clients if they're connected
+    app.frames['mainPage'].tcpControlClose ()
+    sys.exit ()                                     # Return to the operating system
 
 def main ():
-#    initl.logMsg ()                                      # Open up an output file to save log file entries
+    global app
     app = sampleApp ()                              # Set up the TK environment
     app.protocol ('WM_DELETE_WINDOW', closeWindow)  # Call this routine when someone exits the program
     app.mainloop()                                  # and let it run...
