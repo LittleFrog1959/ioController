@@ -11,6 +11,7 @@ import subprocess
 import errno
 import datetime as dt
 import sys
+import time
 
 # The AB Electronics driver for the PIO board
 from IOPi import IOPi
@@ -25,7 +26,35 @@ g = globals.globals ()
 
 # Set up the logging system
 import logging
-l = logging.log ()
+
+class logClass (logging.log):
+    # This class inherits the disk logger and allows all
+    # of it's methods to be used here.
+    def __init__ (self):
+        super().__init__ ()
+
+    def logMsg (self, message, level = 'debug'):
+        # NOTE:  The max message length is about 130 chars
+        # Form the message then send to the disk log
+        m = self.logDiskMsg (message, level)
+        # Send the message to the message text box. At the
+        # moment this will error if a message is produced
+        # before the messagePage is defined so I just
+        # print to the terminal session that started the
+        # program
+        try:
+            app.frames['messagePage'].addMsg (m)
+        except NameError:
+            print ('Could not print to messagePage')
+            print (m)
+
+    def logClose (self):
+        self.logDiskClose ()
+
+    def logFlush (self):
+        self.logDiskFlush ()
+
+l = logClass ()
 
 class sampleApp (tk.Tk):
     # This is the start of the main program that interfaces to the tk system.
@@ -52,7 +81,8 @@ class sampleApp (tk.Tk):
 
         # Build the frame into which all the page definitions will fit
         container = tk.Frame (self)
-        container.pack (side = 'top', fill = 'both', expand = True)
+        container.pack (anchor = 'nw', expand = True, fill = tk.X)
+#        container.pack (side = 'top', fill = 'both', expand = True)
         container.grid_rowconfigure (0, weight = 1)
         container. grid_columnconfigure (0, weight = 1)
 
@@ -75,20 +105,27 @@ class messagePage (tk.Frame):
 
         # Put up the message space
         self.msgText = tk.Text (self)
-        self.msgText.pack ()
+        self.msgText.pack (anchor = 'nw', expand = True, fill = tk.X)
 
         self.button = tk.Button(self, text='I/O',
                    command=lambda: controller.show_frame('mainPage'))
         self.button.pack()
 
-#        self.msgText.after (1000, self.addMsgTest)
+        # Initalise a counter for the number of messages on the screen
+        # I only need this because I can't see a way of knowing how many
+        # rows of text there are on the screen...  There must be a way??
+        self.messageRows = 0
 
     def addMsg (self, m):
+        # Delete the oldest message if we're about to run out of space
+        # in the text box.
+        self.messageRows += 1
+        if self.messageRows > c.messageRowMax:
+            self.messageRows = c.messageRowMax
+            # 1.0...  Don't ask... The first row (1) and the first col (0)
+            self.msgText.delete ('1.0', '2.0')
+        # Print the message to the text box
         self.msgText.insert (tk.END, m + '\n')
-
-#    def addMsgTest (self):
-#        self.msgText.after (1000, self.addMsgTest)
-#        self.addMsg ("Hello")
 
 class rowIOPage(tk.Frame):
     def __init__(self, parent, controller):
@@ -146,13 +183,13 @@ class mainPage(tk.Frame):
         self.tcpControl = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcpData = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        # Bind the connection to a port
-        self.tcpControl.bind ((IPAddress, c.tcpControlPort))
-        self.tcpData.bind ((IPAddress, c.tcpDataPort))
-
         # Allow for the port to be re-used immediately
         self.tcpControl.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
         self.tcpData.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
+
+        # Bind the connection to a port
+        self.tcpControl.bind ((IPAddress, c.tcpControlPort))
+        self.tcpData.bind ((IPAddress, c.tcpDataPort))
 
         # Make all operations with the socket non-blocking. Note that this only sets
         # the way that "socket.accept" works.  There's a seperate statement for
@@ -168,11 +205,19 @@ class mainPage(tk.Frame):
 
     def tcpDataClose (self):
         if self.dataClient != None:
+            print ('Got to close the TCP Data client')
             self.dataClient.close ()
+            self.dataClient = None
+            self.tcpData = None
+            time.sleep (1)
 
     def tcpControlClose (self):
         if self.controlClient != None:
+            print ('Got to close the TCP Control client')
             self.controlClient.close ()
+            self.controlClient = None
+            self.tcpControl = None
+            time.sleep (1)
 
     def createTCPTimers (self):
         # Set up the Control port periodic timer
@@ -506,9 +551,7 @@ class mainPage(tk.Frame):
         # This routine gets called 10 times a second!
         self.ioTimerLabel.after (100, self.ioRefreshTimer)
         if self.ioRefreshState == 0:
-
-            app.frames['messagePage'].addMsg (str (dt.datetime.now ()))
- 
+            l.logMsg ('Hello David')
             # Toggle the on-screen prompt so you know it's working
             if (self.ioTimerLabel.cget ('bg') == 'green'):
                 self.ioTimerLabel.config (bg = c.normalGrey)
@@ -520,8 +563,8 @@ class mainPage(tk.Frame):
             self.updateOutputs ()
             # if we're connected to the TCP client then output a digest
             # of the information
-#            self.tcpSendIOState ('IO update sent:  Periodic output')
-            self.tcpSendIOState ('')
+            self.tcpSendIOState ('IO update sent:  Periodic output')
+#            self.tcpSendIOState ('')
         elif (self.ioRefreshState > 0) and (self.ioRefreshState < 9):
             self.readInputs ()
             self.updateInputs ()
@@ -533,10 +576,13 @@ class mainPage(tk.Frame):
     def tcpSendIOState (self, reason):
         # Only do anything if the data client is connected
         if self.dataClient != None:
-            # Send the reason to the control client if it's connected
- #           if (self.controlClient != None) and (len(reason) > 0):
- #               self.controlClient.send ((str(dt.datetime.now ())[11:] + ' ' + reason + '\r\n').encode ())
-            # Then send a digest of the state, force and name
+            # Log the reason for sending the I/O state if there is one
+#            if len (reason) > 0:
+#                l.logMsg (reason)
+#            # Send the reason to the control client if it's connected
+#            if (self.controlClient != None) and (len(reason) > 0):
+#                self.controlClient.send ((str(dt.datetime.now ())[11:] + ' ' + reason + '\r\n').encode ())
+#           # Then send a digest of the state, force and name
             self.dataClient.send (('iBoards = ' + str (len (c.iBoard)) + '\r\n').encode ())
             self.dataClient.send (('oBoards = ' + str (len (c.oBoard)) + '\r\n').encode ())
 
@@ -758,9 +804,9 @@ class mainPage(tk.Frame):
 
 def closeWindow ():
     # Close down the program
-    l.logClose ()                                   # Close the log file
     app.frames['mainPage'].tcpDataClose ()          # Disconnect and TCP clients if they're connected
     app.frames['mainPage'].tcpControlClose ()
+    l.logClose ()                                   # Close the log file
     sys.exit ()                                     # Return to the operating system
 
 def testOKToRun ():

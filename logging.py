@@ -79,28 +79,22 @@ class log ():
         # Create the new link
         os.symlink (c.logDirectory + f + c.logExtension, c.symbolicLogFilename)
 
-    def logMsg (self, message, level = 'debug'):
+    def logDiskMsg (self, message, level = 'debug'):
+        # Grab the current time
         t = str (dt.datetime.now ())
+        # And form the message with the level padded to 10 chars
         m = t + ' ' + '{:<10}'.format (level) + message
-
-        # Print the message on the message screen
-    #    theApp.frames['messagePage'].addMsg (m)
-    #
-    #    # Bump the messages printed counter and see if we need to delete the oldest one
-    #    g.messageRows += 1
-    #    if msgRows > 5:
-    #        msgRows = 5
-    #        messagePage.a.delete ('1.0', '2.0')
-
         # Now send the message to the log file
         self.logFileHandle.write (m + '\r\n')
         # Simple flush every time I write  to the disk.  I might put this in a timer
         # later on
-        self.logFileFlush ()
+        self.logDiskFlush ()
+        # And finally return the message so it can be sent elsewhere if required
+        return m
 
-    def logClose (self):
+    def logDiskClose (self):
         self.logFileHandle.close ()
 
-    def logFileFlush (self):
+    def logDiskFlush (self):
         self.logFileHandle.flush ()
 

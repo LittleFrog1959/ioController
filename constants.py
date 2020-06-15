@@ -24,6 +24,10 @@ class constants ():
     # when the program's running
     logAge = 10
 
+    # The max number of messages we can have in the message text box
+    # before we loose some off the bottom of the screen.
+    messageRowMax = 20
+
     # Resolution of the touch screen
     touchScreenResolution = '1280x800'
 
