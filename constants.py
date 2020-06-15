@@ -26,7 +26,7 @@ class constants ():
 
     # The max number of messages we can have in the message text box
     # before we loose some off the bottom of the screen.
-    messageRowMax = 20
+    messageRowMax = 45
 
     # Resolution of the touch screen
     touchScreenResolution = '1280x800'

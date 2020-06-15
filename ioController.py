@@ -81,8 +81,9 @@ class sampleApp (tk.Tk):
 
         # Build the frame into which all the page definitions will fit
         container = tk.Frame (self)
-        container.pack (anchor = 'nw', expand = True, fill = tk.X)
-#        container.pack (side = 'top', fill = 'both', expand = True)
+#        container.pack (anchor = 'nw', expand = True, fill = 'both')
+#        container.pack (anchor = 'nw', expand = True, fill = tk.X)
+        container.pack (side = 'top', fill = 'both', expand = True)
         container.grid_rowconfigure (0, weight = 1)
         container. grid_columnconfigure (0, weight = 1)
 
@@ -105,7 +106,8 @@ class messagePage (tk.Frame):
 
         # Put up the message space
         self.msgText = tk.Text (self)
-        self.msgText.pack (anchor = 'nw', expand = True, fill = tk.X)
+        self.msgText.pack (anchor = 'nw', expand = True, fill = 'both')
+#        self.msgText.pack (anchor = 'nw', expand = True, fill = tk.X)
 
         self.button = tk.Button(self, text='I/O',
                    command=lambda: controller.show_frame('mainPage'))
