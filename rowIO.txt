@@ -1,0 +1,19 @@
+# This is a comment
+
+
++ Outside
+++ Pump one
+O1,1
+I0,0
+++ Elevator
+O0,0
+I0,1
+I0,2
++ Inside
+++ Pump two
+O0,1
+I0,3
+++ Dog Handler
+O0,7
+I0,8
+I0,9

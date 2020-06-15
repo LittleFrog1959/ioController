@@ -7,6 +7,7 @@ from tkinter import font  as tkfont
 
 import socket
 import os
+import subprocess
 import errno
 import datetime as dt
 import sys
@@ -762,7 +763,26 @@ def closeWindow ():
     app.frames['mainPage'].tcpControlClose ()
     sys.exit ()                                     # Return to the operating system
 
+def testOKToRun ():
+    # See if the program is already running.  This is a little bit interesting because if it is,
+    # there will actually be 2 or more running at the same time so you can't just check to see
+    # if 'python ioController.py is in the process table
+    a = int (os.popen ('ps x|grep -c "[p]ython ioController.py"').read ())
+    if (a > 1):
+        print ("Program already running")
+        sys.exit (1)
+
+    # See if we have a valid DISPLAY environment variable.  This stops you attempting to run
+    # the program without a valid X display attached to the terminal session
+    try:
+        os.environ ['DISPLAY']
+    except KeyError:
+        print ('No X Display accociated with this terminal session so program cannot run')
+        sys.exit (1)
+
 def main ():
+    # Work out if the program is already running and exit if it is
+    testOKToRun ()
     global app
     app = sampleApp ()                              # Set up the TK environment
     app.protocol ('WM_DELETE_WINDOW', closeWindow)  # Call this routine when someone exits the program
