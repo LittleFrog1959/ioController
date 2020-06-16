@@ -1,0 +1,21 @@
++Pump 1
+O0,0
+I0,0
+I0,1
++Pump 2
+O1,1
+I0,2
+I0,3
++Energiser 1
+O2,3
+O2,4
+I0,4
+I0,5
+I0,6
+I0,7
++Pump 3
+O2,5
+I0,8
+I0,9
++Switch 1
+I0,10
