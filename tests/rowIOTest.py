@@ -66,7 +66,7 @@ class StartPage(tk.Frame):
                 self.board, self.pin = self.getBoardnPin (self.fLine)
                 self.oRBtn.append (0)
                 pointer = len (self.oRBtn) - 1
-                self.oRBtn [pointer] = tk.Button (self.toggleFrame, text = 'O' + str (self.board) + ',' + str (self.pin), width = 6,
+                self.oRBtn [pointer] = tk.Button (self.toggleFrame, text = 'off\n' + 'O' + str (self.board) + ',' + str (self.pin) + '\nforce on', width = 6,
                                 anchor = 'w', justify = tk.LEFT)
                 self.oRBtn [pointer].pack ()
                 if self.toggleFrame == self.leftFrame:
@@ -77,7 +77,7 @@ class StartPage(tk.Frame):
                 self.board, self.pin = self.getBoardnPin (self.fLine)
                 self.iRBtn.append (0)
                 pointer = len (self.iRBtn) - 1
-                self.iRBtn [pointer] = tk.Button (self.toggleFrame, text = 'I' + str (self.board) + ',' + str (self.pin), width = 6,
+                self.iRBtn [pointer] = tk.Button (self.toggleFrame, text = 'on\n' + 'I' + str (self.board) + ',' + str (self.pin) + '\nlive', width = 6,
                                 anchor = 'w', justify = tk.LEFT)
                 self.iRBtn [pointer].pack ()
                 if self.toggleFrame == self.leftFrame:
