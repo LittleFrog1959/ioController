@@ -1,19 +1,63 @@
 # This is a comment
 
-
-+ Outside
-++ Pump one
++Pump one
 O1,1
 I0,0
-++ Elevator
+
++Elevator
 O0,0
 I0,1
 I0,2
-+ Inside
-++ Pump two
+
++Pump two
 O0,1
 I0,3
-++ Dog Handler
+
++Dog Handler
 O0,7
 I0,8
 I0,9
+
++David
+O3,14
+I1,2
+I3,15
+I2,9
+O1,1
+O0,0
+O3,1
+
++Paul
+O3,14
+I1,2
+I3,15
+I2,9
+O1,1
+O0,0
+O3,1
+
++June
+I3,1
+O3,1
+
++Trevor
+O3,14
+I1,2
+I3,15
+I2,9
+O1,1
+O0,0
+O3,1
+
++Nigel
+O3,14
+I1,2
+I3,15
+I2,9
+O1,1
+O0,0
+O3,1
+
++Simon
+I3,1
+O3,1

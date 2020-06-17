@@ -35,6 +35,10 @@ class constants ():
     tcpControlPort = 10000
     tcpDataPort = 10001
 
-    #tkInter colours and other bits and bobs
+    # tkInter colours and other bits and bobs
     normalGrey = '#d9d9d9'
     brightGrey = "#e9e9e9"
+
+    # Number of colomns on the rowsIO page
+    fCount = 4
+
