@@ -19,3 +19,16 @@ I0,8
 I0,9
 +Switch 1
 I0,10
++Switch 2
+I0,11
++Switch 3
+I0,12
++Switch 4
+I0,13
++Energiser 2
+O3,3
+O3,4
+I1,4
+I1,5
+I1,6
+I1,7
