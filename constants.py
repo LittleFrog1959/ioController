@@ -40,5 +40,5 @@ class constants ():
     brightGrey = "#e9e9e9"
 
     # Number of colomns on the rowsIO page
-    fCount = 4
+    fCount = 5
 

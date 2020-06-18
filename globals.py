@@ -8,6 +8,10 @@ class globals ():
     # cause a simple scroll of the text widget (i.e. The oldest msg deleted)
     messageRows = 0
 
+    # Used by the pop up menu to pass across the board/pin we're going to
+    # alter
+    popUpBoard = 0
+    popUpPin = 0
 
     # Global creates:
     # - A pair of lists containing the true state of the input or output pins

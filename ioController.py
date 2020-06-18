@@ -88,7 +88,7 @@ class sampleApp (tk.Tk):
         container. grid_columnconfigure (0, weight = 1)
 
         self.frames = {}
-        for F in (mainPage, messagePage, rowIOPage):
+        for F in (rowIOPage, mainPage, messagePage):
             page_name = F.__name__
             frame = F (parent = container, controller = self)
             self.frames [page_name] = frame
@@ -136,7 +136,43 @@ class rowIOPage(tk.Frame):
 
         # First create a frame to hold the exit buttons at the bottom of the page
         self.bottomFrame = tk.Frame (self)
-        self.bottomFrame.pack (side = tk.BOTTOM, expand = True)
+#        self.bottomFrame.pack (side = tk.BOTTOM, expand = True)
+        self.bottomFrame.pack (side = tk.BOTTOM)
+
+        # Create a canvas within which all one big frame and the context menus will be presented
+        self.canvas = tk.Canvas (self)
+
+        # And then within that canvas, create a frame which will hold the columns of buttons
+        self.bigFrame = tk.Frame (self.canvas)
+#        self.bigFrame.place (x = 1, y = 1)
+        self.bigFrame.pack (side = tk.LEFT, expand = True)
+        self.bigFrame.pack (side = tk.LEFT)
+
+        # Now create one scroll bar that will make the whole frame go up and down the screen
+        self.sb = tk.Scrollbar (self, orient = 'vertical', command = self.canvas.yview)
+        self.canvas.configure (yscrollcommand = self.sb.set)
+        self.sb.pack (side = 'right', fill = 'y')
+        self.canvas.pack (side = 'left')
+        self.canvas.create_window ((0, 0), window = self.bigFrame, anchor = 'nw')
+        self.bigFrame.bind ('<Configure>', self.scrollFunction)
+
+        # Create a pop up menu to control the forced state of a selected pin
+        self.outputPopUpMenu = tk.Menu (self.bigFrame, tearoff = 0)
+        self.outputPopUpMenu.config (font = (None, 20))
+        self.outputPopUpMenu.add_command (label = 'output')
+        self.outputPopUpMenu.entryconfigure (0, state = tk.DISABLED)
+        self.outputPopUpMenu.add_command (label = 'live', command = self.setOutputPinLive)
+        self.outputPopUpMenu.add_command (label = 'force on', command = self.setOutputPinForceOn)
+        self.outputPopUpMenu.add_command (label = 'force off', command = self.setOutputPinForceOff)
+
+        self.inputPopUpMenu = tk.Menu (self.bigFrame, tearoff = 0)
+        self.inputPopUpMenu.config (font = (None, 20))
+        self.inputPopUpMenu.add_command (label = 'input')
+        self.inputPopUpMenu.entryconfigure (0, state = tk.DISABLED)
+        self.inputPopUpMenu.add_command (label = 'live', command = self.setInputPinLive)
+        self.inputPopUpMenu.add_command (label = 'force on', command = self.setInputPinForceOn)
+        self.inputPopUpMenu.add_command (label = 'force off', command = self.setInputPinForceOff)
+
         # Now create the frames that will hold the pins
         self.fList = []
         for f in range (0, c.fCount):
@@ -144,7 +180,7 @@ class rowIOPage(tk.Frame):
             self.fList.append (0)
             # Now within the current list item, create a list which contains the button at [0]
             # and a simple INT at [1]
-            self.fList[f] = [tk.Frame (self, padx = 10, pady = 10)]
+            self.fList[f] = [tk.Frame (self.bigFrame, padx = 10, pady = 10)]
             # This zero will be the "rows used" counter for each frame
             self.fList[f].append (0)
             # Now pack the frame
@@ -172,8 +208,9 @@ class rowIOPage(tk.Frame):
                 # be the current frame.  Note how we add this as a list becuase
                 # in a moment we're going to add the board and pin to this one
                 # pointer entry
-                self.oRBtn [pointer] = [tk.Button (self.fList[fPointer][0], text = 'off\n' + 'O' + str (self.board) + ',' + str (self.pin) + '\nforce on', width = 20,
-                                anchor = 'w', justify = tk.LEFT)]
+                self.oRBtn [pointer] = [tk.Button (self.fList[fPointer][0], text = 'null', width = 20,
+                                anchor = 'w', justify = tk.LEFT,
+                                command = lambda x = pointer: self.outputPopUpCallBack (x))]
                 self.oRBtn [pointer][0].pack (padx = 15, pady = 5)
                 # Append two more list items to this entry to save the board and pin
                 self.oRBtn [pointer].append (self.board)
@@ -190,8 +227,9 @@ class rowIOPage(tk.Frame):
                 pointer = len (self.iRBtn) - 1
                 # Create the button in the button list AND have it's parent
                 # be the current frame
-                self.iRBtn [pointer] = [tk.Button (self.fList[fPointer][0], text = 'off\n' + 'O' + str (self.board) + ',' + str (self.pin) + '\nforce on', width = 20,
-                                anchor = 'w', justify = tk.LEFT)]
+                self.iRBtn [pointer] = [tk.Button (self.fList[fPointer][0], text = 'null', width = 20,
+                                anchor = 'w', justify = tk.LEFT,
+                                command = lambda x = pointer: self.inputPopUpCallBack (x))]
                 self.iRBtn [pointer][0].pack (padx = 15, pady = 5)
                 # Append two more list items to this entry to save the board and pin
                 self.iRBtn [pointer].append (self.board)
@@ -202,10 +240,25 @@ class rowIOPage(tk.Frame):
             elif self.fLine [0] == "+":
                 # Figure out which frame we're going to use for all following specification
                 # file entries. Remember that fPointer contains the current frame
-                fPointer = 0
-                for pointer in range (0, len (self.fList) - 1):
-                    if self.fList[pointer][1] > self.fList[pointer + 1][1]:
-                        fPointer = pointer + 1
+
+                # debug
+                l.logMsg ('Title ' + self.fLine[1:-1])
+                debug = ''
+                for pointer in range (0, len (self.fList)):
+                    debug = debug + ' ' + str (pointer) + '-' + str (self.fList[pointer][1])
+                l.logMsg (debug)
+
+#                fPointer = 0
+#                for pointer in range (0, len (self.fList) - 1):
+#                    if self.fList[pointer][1] > self.fList[pointer + 1][1]:
+#                        fPointer = pointer + 1
+
+                # Find the lowest row count and remember the column that's in
+                lowest = 999999
+                for pointer in range (0, len (self.fList)):
+                    if self.fList[pointer][1] < lowest:
+                        lowest = self.fList[pointer][1]
+                        fPointer = pointer
 
                 # Add the title to the correct frame
                 label = tk.Label (self.fList[fPointer][0], text = self.fLine[1:-1])
@@ -221,6 +274,10 @@ class rowIOPage(tk.Frame):
                 # Throw away blank lines
                 pass
 
+            elif self.fLine.find ("abort") == 0:
+                # If the line starts with abort then stop reading the input specification
+                # file
+                break
             else:
                 print ('Error')
 
@@ -239,12 +296,112 @@ class rowIOPage(tk.Frame):
 #        for entry in self.iRBtn:
 #            print ("Input  " + str (entry))
 
+    def scrollFunction (self, event):
+        self.canvas.configure (scrollregion = self.canvas.bbox ('all'), width = 1270, height = 710)
+#        self.canvas.configure (scrollregion = self.canvas.bbox ('all'))
+
+    def outputPopUpCallBack (self, p):
+        # Given the current mouse location, fix the location that the menu will be placed
+        x, y = self.fixPopUpLocation ()
+
+        # We get the board and pin as parameters.  Make these visable to the selected menu
+        # items through these variables
+        g.popUpBoard = self.oRBtn[p][1]
+        g.popUpPin = self.oRBtn[p][2]
+
+        # There might already be another pop up menu being displayed so remove it.  This does
+        # not seem to error if it's not being displayed which is good I guess
+        self.inputPopUpMenu.unpost ()
+
+        try:
+            # Fix the name of the menu to be the name of the pin we're trying to change state
+            # on then display the menu
+            self.outputPopUpMenu.entryconfigure (0, label = g.oName[g.popUpBoard][g.popUpPin])
+            self.outputPopUpMenu.post (x, y)
+        except:
+            l.logMsg ('Unknown error while trying to present output pop up menu', level = 'alarm')
+
+    def inputPopUpCallBack (self, p):
+        # Given the current mouse location, fix the location that the menu will be placed
+        x, y = self.fixPopUpLocation ()
+
+        g.popUpBoard = self.iRBtn[p][1]
+        g.popUpPin = self.iRBtn[p][2]
+        self.outputPopUpMenu.unpost ()
+
+        try:
+            self.inputPopUpMenu.entryconfigure (0, label = g.iName[g.popUpBoard][g.popUpPin])
+            self.inputPopUpMenu.post (x, y)
+        except:
+            l.logMsg ('Unknown error while trying to present input pop up menu', level = 'alarm')
+
+    def setOutputPinLive (self):
+        g.oForce[g.popUpBoard][g.popUpPin] = 'live'
+        self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
+        app.frames['mainPage'].updateOutputs ()
+
+    def setOutputPinForceOn (self):
+        g.oForce[g.popUpBoard][g.popUpPin] = 'force on'
+        self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
+        app.frames['mainPage'].updateOutputs ()
+
+    def setOutputPinForceOff (self):
+        g.oForce[g.popUpBoard][g.popUpPin] = 'force off'
+        self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
+        app.frames['mainPage'].updateOutputs ()
+
+    def setInputPinLive (self):
+        g.iForce[g.popUpBoard][g.popUpPin] = 'live'
+        self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
+        app.frames['mainPage'].updateInputs ()
+
+    def setInputPinForceOn (self):
+        g.iForce[g.popUpBoard][g.popUpPin] = 'force on'
+        self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
+        app.frames['mainPage'].updateInputs ()
+
+    def setInputPinForceOff (self):
+        g.iForce[g.popUpBoard][g.popUpPin] = 'force off'
+        self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
+        app.frames['mainPage'].updateInputs ()
+
+    def fixPopUpLocation (self):
+        # Given the current location of the mouse, fix it so that that
+        # pop up menu appears at a useful place
+        x = self.winfo_pointerx ()
+        y = self.winfo_pointery ()
+        x = x + 70                      # Shift it to the right and down a bit
+        y = y + 70
+        if (x > 1100):                  # If we're getting near the right of
+            x = x - 240                 # the screen, move the menu way left
+        if (y > 600):                   # Similarly if we're near the bottom
+            y = y - 160                 # joggle us up a bit
+        return x, y
+
     def getBoardnPin (self, lt):
         # Seperate out the board and pin from the supplied text
         address = lt[1:]
         b = int (address.split (',')[0])
         p = int (address.split (',')[1])
         return b, p
+
+    def updateInput (self, b, p):
+        # Given the board and pin which has changed state, see if it's used on the
+        # rowIO page and if it is, update it
+        for pin in range (0, len (self.iRBtn)):
+            if (self.iRBtn[pin][1] == b) & (self.iRBtn[pin][2] == p):
+                self.iRBtn[pin][0].config (activebackground = app.frames['mainPage'].iBtn[b][p].cget ('activebackground'))
+                self.iRBtn[pin][0].config (highlightbackground = app.frames['mainPage'].iBtn[b][p].cget ('highlightbackground'))
+                self.iRBtn[pin][0].config (background = app.frames['mainPage'].iBtn[b][p].cget ('background'))
+                self.iRBtn[pin][0].config (text = app.frames['mainPage'].iBtn[b][p].cget ('text'))
+
+    def updateOutput (self, b, p):
+        for pin in range (0, len (self.oRBtn)):
+            if (self.oRBtn[pin][1] == b) & (self.oRBtn[pin][2] == p):
+                self.oRBtn[pin][0].config (activebackground = app.frames['mainPage'].oBtn[b][p].cget ('activebackground'))
+                self.oRBtn[pin][0].config (highlightbackground = app.frames['mainPage'].oBtn[b][p].cget ('highlightbackground'))
+                self.oRBtn[pin][0].config (background = app.frames['mainPage'].oBtn[b][p].cget ('background'))
+                self.oRBtn[pin][0].config (text = app.frames['mainPage'].oBtn[b][p].cget ('text'))
 
 class mainPage(tk.Frame):
     def __init__(self, parent, controller):
@@ -270,12 +427,14 @@ class mainPage(tk.Frame):
         # TCP/IP code so that it runs along side the TK interface
         self.createTCPTimers ()
 
-        # Populate the bit maps for both inputs and outputs and then
-        # send these to the UI
-        self.readInputs ()
-        self.readOutputs ()
-        self.updateInputs ()
-        self.updateOutputs ()
+        # I used to populate the bit maps for both inputs and outputs and then
+        # send these to the UI but I've deferred this to the main program
+        # because it allows for all the other pages to have initalised before
+        # we do inter-class calls (which fail if you do them here)
+#        self.readInputs ()
+#        self.readOutputs ()
+#        self.updateInputs ()
+#        self.updateOutputs ()
 
     def createTCPServers (self):
         # Before we start on the actual TCP stuff, work out the IP address
@@ -532,6 +691,12 @@ class mainPage(tk.Frame):
                     # Set the state of the input pin...  This does not actually do anything
                     # apart from update the colours of the buttons on the UI
                     self.setInputPin (board, pin)
+                    # Call a method in the rowIOPage to see if this changed pin is
+                    # being displayed.  If it is, then update it.
+#                    try:
+                    app.frames['rowIOPage'].updateInput (board, pin)
+#                    except NameError:
+#                        l.logMsg ("rowIOPage input state change failed as app not created")
                     somethingChanged = True
         if somethingChanged == True:
             self.tcpSendIOState ('IO update sent:  Change of input state')
@@ -548,6 +713,12 @@ class mainPage(tk.Frame):
                     # Set the state of the output pin even though it might be the same
                     # (e.g. If the change in text was the pin name)
                     self.setOutputPin (board, pin)
+                    # Call a method in the rowIOPage to see if this changed pin is
+                    # being displayed.  If it is, then update it.
+#                    try:
+                    app.frames['rowIOPage'].updateOutput(board, pin)
+#                    except NameError:
+#                        l.logMsg ("rowIOPage output state change failed as app not created")
                     somethingChanged = True
         if somethingChanged == True:
            self.tcpSendIOState ('IO update sent:  Change of output state')
@@ -660,7 +831,7 @@ class mainPage(tk.Frame):
         # This routine gets called 10 times a second!
         self.ioTimerLabel.after (100, self.ioRefreshTimer)
         if self.ioRefreshState == 0:
-            l.logMsg ('Hello David')
+#            l.logMsg ('Hello David')
             # Toggle the on-screen prompt so you know it's working
             if (self.ioTimerLabel.cget ('bg') == 'green'):
                 self.ioTimerLabel.config (bg = c.normalGrey)
@@ -833,8 +1004,8 @@ class mainPage(tk.Frame):
 
         # We get the board and pin as parameters.  Make these visable to the selected menu
         # items through these variables
-        self.popupBoard = b
-        self.popupPin = p
+        g.popUpBoard = b
+        g.popUpPin = p
 
         # There might already be another pop up menu being displayed so remove it.  This does
         # not seem to error if it's not being displayed which is good I guess
@@ -852,8 +1023,8 @@ class mainPage(tk.Frame):
         # Given the current mouse location, fix the location that the menu will be placed
         x, y = self.fixPopUpLocation ()
 
-        self.popupBoard = b
-        self.popupPin = p
+        g.popUpBoard = b
+        g.popUpPin = p
         self.outputPopUpMenu.unpost ()
 
         try:
@@ -863,32 +1034,32 @@ class mainPage(tk.Frame):
             l.logMsg ('Unknown error while trying to present input pop up menu', level = 'alarm')
 
     def setOutputPinLive (self):
-        g.oForce[self.popupBoard][self.popupPin] = 'live'
+        g.oForce[g.popUpBoard][g.popUpPin] = 'live'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
         self.updateOutputs ()
 
     def setOutputPinForceOn (self):
-        g.oForce[self.popupBoard][self.popupPin] = 'force on'
+        g.oForce[g.popUpBoard][g.popUpPin] = 'force on'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
         self.updateOutputs ()
 
     def setOutputPinForceOff (self):
-        g.oForce[self.popupBoard][self.popupPin] = 'force off'
+        g.oForce[g.popUpBoard][g.popUpPin] = 'force off'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
         self.updateOutputs ()
 
     def setInputPinLive (self):
-        g.iForce[self.popupBoard][self.popupPin] = 'live'
+        g.iForce[g.popUpBoard][g.popUpPin] = 'live'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
         self.updateInputs ()
 
     def setInputPinForceOn (self):
-        g.iForce[self.popupBoard][self.popupPin] = 'force on'
+        g.iForce[g.popUpBoard][g.popUpPin] = 'force on'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
         self.updateInputs ()
 
     def setInputPinForceOff (self):
-        g.iForce[self.popupBoard][self.popupPin] = 'force off'
+        g.iForce[g.popUpBoard][g.popUpPin] = 'force off'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
         self.updateInputs ()
 
@@ -941,7 +1112,14 @@ def main ():
     global app
     app = sampleApp ()                              # Set up the TK environment
     app.protocol ('WM_DELETE_WINDOW', closeWindow)  # Call this routine when someone exits the program
-    app.mainloop()                                  # and let it run...
+
+    # Read the IO and update the buttons as required.  Also send TCP output if required.
+    app.frames['mainPage'].readInputs ()
+    app.frames['mainPage'].readOutputs ()
+    app.frames['mainPage'].updateInputs ()
+    app.frames['mainPage'].updateOutputs ()
+
+    app.mainloop()                                  # and finally let tkInter run...
 
 if __name__ == '__main__':
     main ()
