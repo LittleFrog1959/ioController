@@ -6,19 +6,29 @@ import time
 import os
 import errno
 import curses
-
 import datetime as dt
 
 dump = open ("dump.txt", "w")
 
-# Set up a couple of variables to hold IO Controller sizing
-global iBoards, oBoards
-iBoards = None
-oBoards = None
+## Set up a couple of variables to hold IO Controller sizing
+#global iBoards, oBoards
+#iBoards = None
+#oBoards = None
 
+class globals ():
+    iBoards = None
+    oBoards = None
+    iState = []
+    iForce = []
+    iName = []
+    oState = []
+    oForce = []
+    oName = []
+
+g = globals ()
 
 # Tell this program where the server is
-serverIPAddress = '192.168.1.101'
+serverIPAddress = '192.168.1.106'
 serverIPPort = 10001
 
 # Learn our IP address
@@ -47,9 +57,6 @@ def main (ui, *args):
                     # Grab the incoming bytes and convert to a string using default
                     # encoding
                     RxD = client.recv (1024).decode ()
-                    dump.write ("\r\nGot the following from the port\r\n")
-                    dump.write (RxD)
-                    dump.write ("\r\nThat was the port input\r\n")
                     RxDBuffer = RxDBuffer + RxD
                 except KeyboardInterrupt:
                     curses.echo ()
@@ -59,72 +66,52 @@ def main (ui, *args):
                 except:
                     ui.addstr (0, 0, 'Error')
                     ui.refresh ()
+
                 if gotStart == False:
                     # We don't have the start of the packet yet
-                    if RxDBuffer.find ('iBoards') != -1:
+                    if RxDBuffer.find ('g.iBoards') != -1:
                         # Delete everything upto the iBoards text
-                        RxDBuffer = RxDBuffer[RxDBuffer.find ('iBoards'):]
+                        RxDBuffer = RxDBuffer[RxDBuffer.find ('g.iBoards'):]
                         gotStart = True
-                        dump.write ("\r\nSet gotStart True\r\n")
                         row = 1
-                        row, RxDBuffer = printLine (row, RxDBuffer)
                 else:
-                    # We have already detected the start of packet so
-                    # just print out what comes in UNLESS we find another start
-                    # of packet in which case reset the row pointer
-                    if RxDBuffer.find ('iBoards') != -1:
-                        dump.write ("\r\nReset row counter\r\n")
-                        row = 1
                     row, RxDBuffer = printLine (row, RxDBuffer)
 
 def printLine (r, m):
-    dump.write ('\r\nEntered printLine with \r\n')
-    dump.write (m)
-    dump.write ('\r\nThat was what we entered printLine with\r\n')
-
     # This function could end up printing many lines of text...
     while (m.find ("\n")) != -1:
         # Slice off the string to print without the \r\n
         lineOfText = m[0:m.find ("\n") - 1]
-
-        # Process the line we've just received
-
-        if (lineOfText.find ('iBoards') == 0) and (iBoards == None):
+        if (lineOfText.find ('g.iBoards') == 0) and (g.iBoards == None):
             # Create the lists needed to hold input information
-            print ("£" + lineOfText)
+            dump.write  ("******" + lineOfText + "*******\n")
             exec (lineOfText)     # populate iBoard
-            print (str (iBoards))
-            time.sleep (10)
-            dump.write (lineOfText + "\r\n")
-            for p in range (0, iBoards):
-                iState.append ([])
-                iForce.append ([])
-                iName.append ([])
-        if (lineOfText.find ('oBoards') == 0) and (oBoards == None):
+            dump.write ("xxxxx" + str (g.iBoards) + "xxxxx")
+            for p in range (0, g.iBoards):
+                g.iState.append ([])
+                g.iForce.append ([])
+                g.iName.append ([])
+        if (lineOfText.find ('g.oBoards') == 0) and (g.oBoards == None):
             # Create the lists needed to hold input information
             exec (lineOfText)           # populate oBoard
-            dump.write (lineOfText + "\r\n")
-            for p in range (0, oBoards):
-                oState.append ([])
-                oForce.append ([])
-                oName.append ([])
+            for p in range (0, g.oBoards):
+                g.oState.append ([])
+                g.oForce.append ([])
+                g.oName.append ([])
 
         # It should be safe to exec anything now
         exec (lineOfText)
+        if lineOfText.find ('g.iBoards') == 0:
+            r = 1
 
-        dump.write ("\r\nhere's what we printed\r\n")
-        dump.write (lineOfText)
-        dump.write ("\r\nThat's what we printed\r\n")
-        ui.addstr (r, 0, str (dt.datetime.now ())[17:] + " " + str (r) + " " + lineOfText)
+        outputLine = str (dt.datetime.now ())[17:] + " " + str (r) + " " + lineOfText
+        ui.addstr (r, 0, outputLine)
         ui.clrtoeol ()
         ui.refresh ()
         r += 1
         # Now trim off what we just printed remembering that it's \r\n at the
         # end of the line
         m = m[m.find ("\n") + 1:]
-    dump.write ('\r\nLeft printLine with \r\n')
-    dump.write (m)
-    dump.write ("\r\nThats what we left printLine with\r\n")
     return r, m
 
 if __name__ == "__main__":

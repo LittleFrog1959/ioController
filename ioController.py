@@ -863,8 +863,8 @@ class mainPage(tk.Frame):
 #            if (self.controlClient != None) and (len(reason) > 0):
 #                self.controlClient.send ((str(dt.datetime.now ())[11:] + ' ' + reason + '\r\n').encode ())
 #           # Then send a digest of the state, force and name
-            self.dataClient.send (('iBoards = ' + str (len (c.iBoard)) + '\r\n').encode ())
-            self.dataClient.send (('oBoards = ' + str (len (c.oBoard)) + '\r\n').encode ())
+            self.dataClient.send (('g.iBoards = ' + str (len (c.iBoard)) + '\r\n').encode ())
+            self.dataClient.send (('g.oBoards = ' + str (len (c.oBoard)) + '\r\n').encode ())
 
             for board in range (0, len (g.oState)):
                 self.dataClient.send (('g.oState [' + str (board) + '] = ' + str (g.oState[board]) + '\r\n').encode ())
