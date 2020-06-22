@@ -1,9 +1,11 @@
-# globals used by the ioController and testController programs
+# globals used by the ioController and testController programs.  Note that
+# there are two classes here; one for the IO Controller and the other for the
+# Test Controller.
 
 import constants
 c=constants.constants ()
 
-class globals ():
+class ioGlobals ():
     # The number of messages sent to the messagePage.  This is used to
     # cause a simple scroll of the text widget (i.e. The oldest msg deleted)
     messageRows = 0
@@ -61,4 +63,75 @@ class globals ():
             iForce[board].append ('live')
             iName[board].append ('I' + str (board) + ',' + str (pin))
 
+
+# Here are the globals used by the Test Controller program.  It's all
+# very much like the IO Controller end but the massive lists describing
+# the state of the IO have another dimension to them...  Which controller
+# they relate to...
+class ioInformation ():
+    iBoards = None
+    oBoards = None
+
+    oState = []
+    oldoBtnText = []
+    oForce = []
+    oName = []
+    for board in range (0, len(c.oBoard)):
+        # Create a new row (which is the "board" axis)
+        oState.append ([])
+        oldoBtnText.append ([])
+        oForce.append ([])
+        oName.append ([])
+        # Then populate each row with 16 values (for pin 0-15)
+        for pin in range (0, c.pinsPerBoard):
+            oState[board].append ('null')
+            oldoBtnText[board].append ('')
+            oForce[board].append ('live')
+            oName[board].append ('O' + str (board) + ',' + str (pin))
+
+    iState = []
+    oldiBtnText = []
+    iForce = []
+    iName = []
+    for board in range (0, len(c.iBoard)):
+        iState.append ([])
+        oldiBtnText.append ([])
+        iForce.append ([])
+        iName.append ([])
+        for pin in range (0, c.pinsPerBoard):
+            iState[board].append ('null')
+            oldiBtnText[board].append ('')
+            iForce[board].append ('live')
+            iName[board].append ('I' + str (board) + ',' + str (pin))
+
+class testGlobals ():
+    # The first part of the network address, leaving the subnet part to the list
+    # below.
+    tcpAddress = '192.168.1.'
+
+    # Extend the globals to include a list of ports to connect to
+    tcpList = ['100', 10000, 'c', -1, None, None, "", False], \
+              ['100', 10001, 'd', -1, None, None, "", False]
+
+    # This is a list of pointers which I use so that the fields in the above list
+    # are named rather than numbered
+    ipAddress = 0
+    ipPort = 1
+    duty = 2
+    state = 3                       # -1 Need to create a socket object when time is right
+                                    # 0  Need to attempt a connect when the time is right
+                                    # 1  We're connected, need to get on with it
+    handle = 4
+    connect = 5
+    RxDBuffer = 6
+    gotStart = 7
+
+    # The delay between attempts to create a connection to each port
+    connectDwell = 5
+
+    # Create a list which is made up of a class called "testGlobals" found in the
+    # globals module.  There's one of these for each entry in tcpList
+    ioData = []
+    for pointer in range (0, len (tcpList)):
+        ioData.append (ioInformation ())
 

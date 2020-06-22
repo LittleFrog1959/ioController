@@ -5,7 +5,7 @@ import constants
 c = constants.constants ()
 
 import globals
-g = globals.globals ()
+g = globals.ioGlobals ()
 
 # Logging system for ioController and testController
 

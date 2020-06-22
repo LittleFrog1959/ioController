@@ -66,6 +66,8 @@ def main (ui, *args):
                     sys.exit ()
                 except:
                     ui.addstr (0, 0, 'Error')
+                    print ("*********************************************")
+                    time.sleep (10)
                     ui.refresh ()
 
                 if gotStart == False:

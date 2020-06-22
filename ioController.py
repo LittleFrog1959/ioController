@@ -22,7 +22,7 @@ c = constants.constants ()
 
 # File containing globals used by this program
 import globals
-g = globals.globals ()
+g = globals.ioGlobals ()
 
 # Set up the logging system
 import logging
@@ -576,6 +576,7 @@ class mainPage(tk.Frame):
         elif args[0] == 'exec':
             # Use the full supplied string but remove the word "exec "
             args = RxD[RxD.find (' '):].lstrip (' ')
+            l.logMsg ("we are execing this " + str (args))
             exec (args)
             # Refresh the state of the button text in case something got updated
             self.updateInputs ()
@@ -831,7 +832,6 @@ class mainPage(tk.Frame):
         # This routine gets called 10 times a second!
         self.ioTimerLabel.after (100, self.ioRefreshTimer)
         if self.ioRefreshState == 0:
-#            l.logMsg ('Hello David')
             # Toggle the on-screen prompt so you know it's working
             if (self.ioTimerLabel.cget ('bg') == 'green'):
                 self.ioTimerLabel.config (bg = c.normalGrey)
