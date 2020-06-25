@@ -6,6 +6,10 @@ import constants
 c=constants.constants ()
 
 class ioGlobals ():
+    # The IP address of the io controller is learned as the program
+    # starts
+    ioIPAddress = None
+
     # The number of messages sent to the messagePage.  This is used to
     # cause a simple scroll of the text widget (i.e. The oldest msg deleted)
     messageRows = 0
@@ -112,6 +116,9 @@ class testGlobals ():
     # Extend the globals to include a list of ports to connect to
     tcpList = ['100', 10000, 'c', -1, None, None, "", False], \
               ['100', 10001, 'd', -1, None, None, "", False]
+
+    # Boolean to say when testController is running the quick test
+    testOne = False
 
     # This is a list of pointers which I use so that the fields in the above list
     # are named rather than numbered

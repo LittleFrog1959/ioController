@@ -79,16 +79,29 @@ class log ():
         # Create the new link
         os.symlink (c.logDirectory + f + c.logExtension, c.symbolicLogFilename)
 
+        self.logDiskMsg ('')
+        self.logDiskMsg ('Starting disk log')
+        self.logDiskMsg ('')
+
     def logDiskMsg (self, message, level = 'debug'):
+        # Print the supplied message to the disk and pre-pend it with the date/time
+        # and level (if supplied)
+        # I don't bother to wrap the message to the disk in any kind of nice way
+        # but it does get wrapped when being presented on the messagePage
+
         # Grab the current time
         t = str (dt.datetime.now ())
+
         # And form the message with the level padded to 10 chars
         m = t + ' ' + '{:<10}'.format (level) + message
+
         # Now send the message to the log file
         self.logFileHandle.write (m + '\r\n')
+
         # Simple flush every time I write  to the disk.  I might put this in a timer
         # later on
         self.logDiskFlush ()
+
         # And finally return the message so it can be sent elsewhere if required
         return m
 

@@ -15,6 +15,10 @@ import errno
 
 import globals
 g = globals.testGlobals ()
+g.toggle = False
+
+import constants
+c = constants.constants ()
 
 # Create a dump file for debug messages
 dump = open ('dump.txt', 'w')
@@ -51,7 +55,16 @@ def printLists (pointer):
     # Start of the table to get out of the way of the raw text printout
     lRow = 1 + (pointer * 8)
     ui.addstr (lRow, 0, 'g.iBoards ' + str (g.ioData[pointer].iBoards))
-    ui.addstr (lRow, 40, 'g.oBoards ' + str (g.ioData[pointer].oBoards))
+    ui.addstr (lRow, 20, 'g.oBoards ' + str (g.ioData[pointer].oBoards))
+
+    # Toggle the state of the on-screen activity indicator
+    if g.toggle == False:
+        ui.addstr (lRow, 40, ' ')
+        g.toggle = True
+    else:
+        ui.addstr (lRow, 40, '*')
+        g.toggle = False
+
     ui.clrtoeol ()
     lRow += 1
     # Single loop to print all the output information
@@ -119,7 +132,7 @@ def processDataLines (pointer, m):
 
         # If we're processing iBoards and we already have valid entries for it and oBoards
         # Then we must be at the start of a frame of data values so print them to the screen
-        if (lineOfText.find ('g.iBoards') == 0) & (g.ioData[pointer].iBoards != None) & (g.ioData[pointer].oBoards != None):
+        if (lineOfText.find ('g.iName [3]') == 0) & (g.ioData[pointer].iBoards != None) & (g.ioData[pointer].oBoards != None):
             printLists (pointer)
 
         # Now trim off what we just printed remembering that it's \r\n at the
@@ -130,21 +143,58 @@ def processDataLines (pointer, m):
 def checkKeyboard ():
     # See if the keyboard was pressed
     ch = ui.getch ()
+
     # Check for no key pressed
     if ch == curses.ERR:
         return
+
     elif ch == ord ('q'):
         # Quit the program
         curses.endwin ()
         sys.exit ()
+
     elif ch == ord ('1'):
-#        sendThis = 'exec g.iName[0][0] = "June"'
-#        sendThis = sendThis.encode ()
-        g.tcpList[0][g.handle].sendall (b'exec g.iName[0][0] = "June"\r\n')
+        # Hard coded to use the first port in the list (which must be a Control Port)
+        # Send out a command to change the name of the first input
+        g.tcpList[0][g.handle].send ('exec g.iName[0][0] = "June"\r\n'.encode ())
+
     elif ch == ord ('2'):
-#        sendThis = 'exec g.iName[0][0] = "Dave"'
-#        sendThis = sendThis.encode ()
-        g.tcpList[0][g.handle].sendall (b'exec g.iName[0][0] = "Dave"\r\n')
+        # As above with a different text
+        g.tcpList[0][g.handle].send ('exec g.iName[0][0] = "Dave"\r\n'.encode ())
+
+    elif ch == ord ('3'):
+        # Send a massive command to the first port in the list which updates the names
+        # of all the inputs at once.
+        io = ['exec g.oName [', 'exec g.iName [']
+
+        # Build the output string here
+        sendThis = ""
+
+        # Do the outputs then the inputs
+        for direction in io:
+            # Each board:  Hard coded to 4 boards!
+            for board in range (0, 4):
+                sendThis = sendThis + direction + str(board) + '] = ['
+
+                # Each pin on the board
+                for pin in range (0, c.pinsPerBoard):
+                    sendThis = sendThis + '"' + str (dt.datetime.now ())[17:] + '", '
+
+                # Remove trailing "' " before adding CRLF
+                sendThis = sendThis[0:-2] + ']\r\n'
+
+        g.tcpList[0][g.handle].send (sendThis.encode ())
+
+    elif ch == ord ('4'):
+        # Start / stop the test
+        if g.testOne == False:
+            g.testOne = True
+        else:
+            g.testOne = True
+
+    elif ch == ord ('5'):
+        # Send a syntactically invalid command to the IO Controller
+        g.tcpList[0][g.handle].send ('exec lobsters are lovely\r\n'.encode ())
 
 def stateCreateSocket (pointer):
     # Is it time to create a socket object?
@@ -164,9 +214,13 @@ def stateCreateSocket (pointer):
             # Reset the time to try again and leave the state alone
             g.tcpList[pointer][g.connect] = dt.datetime.now () + dt.timedelta (seconds = 2)
             g.tcpList[pointer][g.state] = -1
-            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+            template = "An exception of type {0} occurred. Arguments:{1!r}"
             message = template.format(type(ex).__name__, ex.args)
             logMsg (message)
+
+def checkTests ():
+    # Run a test which toggles all the IO as quickly as possible
+    return
 
 def stateConnectClient (pointer):
     if g.tcpList[pointer][g.connect] < dt.datetime.now ():
@@ -187,7 +241,7 @@ def stateConnectClient (pointer):
             # Reset the time to try again and leave the state alone
             g.tcpList[pointer][g.connect] = dt.datetime.now () + dt.timedelta (seconds = 2)
             g.tcpList[pointer][g.state] = 0
-            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+            template = "An exception of type {0} occurred. Arguments:{1!r}"
             message = template.format(type(ex).__name__, ex.args)
             logMsg (message)
         else:
@@ -217,7 +271,7 @@ def stateConnected (pointer):
         # Buffer read failed
         logMsg ('Failed read on entry ' + str (pointer))
         # Reset the time to try again and leave the state alone
-        template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+        template = "An exception of type {0} occurred. Arguments:{1!r}"
         message = template.format(type(ex).__name__, ex.args)
         logMsg (message)
         logMsg ('Closing the connection and waiting a bit before attempting reconnect')
@@ -279,6 +333,9 @@ def main (ui, *args):
     while (True):
         # See if the keyboard has been pressed
         checkKeyboard ()
+
+        # See if we're running a test
+        checkTests ()
 
         # Look at the state of each entry in tcpList
         for pointer in range (0, len (g.tcpList)):

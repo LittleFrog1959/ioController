@@ -42,11 +42,23 @@ class logClass (logging.log):
         # before the messagePage is defined so I just
         # print to the terminal session that started the
         # program
-        try:
-            app.frames['messagePage'].addMsg (m)
-        except NameError:
-            print ('Could not print to messagePage')
-            print (m)
+
+        # Init something to hold the message we're going to print
+        wm = None
+        while (len (m) >  0):
+            # Detect first time around the loop
+            if wm == None:
+                # Slice off the first lot of chars
+                wm = m[0:c.messageColMax]
+                m = m[c.messageColMax:]
+            else:
+                wm = ' ' * 10 + m[0:c.messageColMax - 10]
+                m = m[c.messageColMax - 10:]
+            try:
+                app.frames['messagePage'].addMsg (wm)
+            except NameError:
+                print ('Could not print to messagePage')
+                print (m)
 
     def logClose (self):
         self.logDiskClose ()
@@ -241,18 +253,6 @@ class rowIOPage(tk.Frame):
                 # Figure out which frame we're going to use for all following specification
                 # file entries. Remember that fPointer contains the current frame
 
-                # debug
-                l.logMsg ('Title ' + self.fLine[1:-1])
-                debug = ''
-                for pointer in range (0, len (self.fList)):
-                    debug = debug + ' ' + str (pointer) + '-' + str (self.fList[pointer][1])
-                l.logMsg (debug)
-
-#                fPointer = 0
-#                for pointer in range (0, len (self.fList) - 1):
-#                    if self.fList[pointer][1] > self.fList[pointer + 1][1]:
-#                        fPointer = pointer + 1
-
                 # Find the lowest row count and remember the column that's in
                 lowest = 999999
                 for pointer in range (0, len (self.fList)):
@@ -440,8 +440,7 @@ class mainPage(tk.Frame):
         # Before we start on the actual TCP stuff, work out the IP address
         # of eth0 which we're going to use to connect to the other devices
         # in the system
-        IPAddress = os.popen ('ip addr show eth0').read().split ('inet ')[1].split ('/')[0]
-        l.logMsg ('IO Controller IP Address: ' + IPAddress)
+        g.ioIPAddress = os.popen ('ip addr show eth0').read().split ('inet ')[1].split ('/')[0]
 
         # Create two servers that can handle just one client connection
         # at a time
@@ -456,8 +455,8 @@ class mainPage(tk.Frame):
         self.tcpData.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
 
         # Bind the connection to a port
-        self.tcpControl.bind ((IPAddress, c.tcpControlPort))
-        self.tcpData.bind ((IPAddress, c.tcpDataPort))
+        self.tcpControl.bind ((g.ioIPAddress, c.tcpControlPort))
+        self.tcpData.bind ((g.ioIPAddress, c.tcpDataPort))
 
         # Make all operations with the socket non-blocking. Note that this only sets
         # the way that "socket.accept" works.  There's a seperate statement for
@@ -550,16 +549,14 @@ class mainPage(tk.Frame):
                 # Append the incoming bytes to the string (decode
                 # converts the bytes to a string)
                 self.RxDControlBuffer = self.RxDControlBuffer + self.RxD.decode ()
-                EOLPosition = self.RxDControlBuffer.find ('\r\n')
-                if (EOLPosition == -1):
-                    l.logMsg ('TCP control port input is not terminated correctly', level = 'alarm')
-                else:
-                    # Process the command we've just received
-                    self.tcpProcessControl (self.RxDControlBuffer[0:EOLPosition])
+                # Loop round processing lines of text as long as there's a \n in the buffer
+                while self.RxDControlBuffer.find ('\n') != -1:
+                    # Slice off the string to process without the \r\n
+                    self.lineOfText = self.RxDControlBuffer[0:self.RxDControlBuffer.find ("\n") - 1]
+                    # Process the command
+                    self.tcpProcessControl (self.lineOfText)
                     # Trim the command line off the begining of the buffer
-                    self.RxDControlBuffer = self.RxDControlBuffer[EOLPosition + 2:]
-                    if len (self.RxDControlBuffer) > 0:
-                        l.logMsg ('TCP control port RxDBuffer is not empty!')
+                    self.RxDControlBuffer = self.RxDControlBuffer[self.RxDControlBuffer.find ('\n') + 1:]
 
     def tcpProcessControl (self, RxD):
         # Process the supplied command
@@ -576,8 +573,12 @@ class mainPage(tk.Frame):
         elif args[0] == 'exec':
             # Use the full supplied string but remove the word "exec "
             args = RxD[RxD.find (' '):].lstrip (' ')
-            l.logMsg ("we are execing this " + str (args))
-            exec (args)
+            try:
+                exec (args)
+            except Exception as ex:
+                template = "An exception of type {0} occurred. Arguments:{1!r}"
+                message = template.format(type(ex).__name__, ex.args)
+                l.logMsg (message)
             # Refresh the state of the button text in case something got updated
             self.updateInputs ()
             self.updateOutputs ()
@@ -694,10 +695,7 @@ class mainPage(tk.Frame):
                     self.setInputPin (board, pin)
                     # Call a method in the rowIOPage to see if this changed pin is
                     # being displayed.  If it is, then update it.
-#                    try:
                     app.frames['rowIOPage'].updateInput (board, pin)
-#                    except NameError:
-#                        l.logMsg ("rowIOPage input state change failed as app not created")
                     somethingChanged = True
         if somethingChanged == True:
             self.tcpSendIOState ('IO update sent:  Change of input state')
@@ -716,10 +714,7 @@ class mainPage(tk.Frame):
                     self.setOutputPin (board, pin)
                     # Call a method in the rowIOPage to see if this changed pin is
                     # being displayed.  If it is, then update it.
-#                    try:
                     app.frames['rowIOPage'].updateOutput(board, pin)
-#                    except NameError:
-#                        l.logMsg ("rowIOPage output state change failed as app not created")
                     somethingChanged = True
         if somethingChanged == True:
            self.tcpSendIOState ('IO update sent:  Change of output state')
@@ -832,19 +827,18 @@ class mainPage(tk.Frame):
         # This routine gets called 10 times a second!
         self.ioTimerLabel.after (100, self.ioRefreshTimer)
         if self.ioRefreshState == 0:
+            self.readInputs ()
+            self.updateInputs ()
+            # self.readOutputs ()
+            self.updateOutputs ()
             # Toggle the on-screen prompt so you know it's working
             if (self.ioTimerLabel.cget ('bg') == 'green'):
                 self.ioTimerLabel.config (bg = c.normalGrey)
             else:
                 self.ioTimerLabel.config (bg = 'green')
-            self.readInputs ()
-            self.updateInputs ()
-            # self.readOutputs ()
-            self.updateOutputs ()
             # if we're connected to the TCP client then output a digest
             # of the information
             self.tcpSendIOState ('IO update sent:  Periodic output')
-#            self.tcpSendIOState ('')
         elif (self.ioRefreshState > 0) and (self.ioRefreshState < 9):
             self.readInputs ()
             self.updateInputs ()
@@ -1118,6 +1112,11 @@ def main ():
     app.frames['mainPage'].readOutputs ()
     app.frames['mainPage'].updateInputs ()
     app.frames['mainPage'].updateOutputs ()
+
+    l.logMsg ('')
+    l.logMsg ('Starting on-screen message page')
+    l.logMsg ('')
+    l.logMsg ('IO Controller IP Address: ' + g.ioIPAddress)
 
     app.mainloop()                                  # and finally let tkInter run...
 

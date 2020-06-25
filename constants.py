@@ -24,6 +24,10 @@ class constants ():
     # when the program's running
     logAge = 10
 
+    # The max number of cols per message for presentation on the messagePage.
+    # If the message is longer than this then we need to create a multi-line message
+    messageColMax = 130
+
     # The max number of messages we can have in the message text box
     # before we loose some off the bottom of the screen.
     messageRowMax = 45
