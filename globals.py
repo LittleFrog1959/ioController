@@ -114,24 +114,11 @@ class testGlobals ():
     tcpAddress = '192.168.1.'
 
     # Extend the globals to include a list of ports to connect to
-    tcpList = ['100', 10000, 'c', -1, None, None, "", False], \
-              ['100', 10001, 'd', -1, None, None, "", False]
+    tcpList = ['100', 10000, 'c', c.createSocket, None, None, "", False], \
+              ['100', 10001, 'd', c.createSocket, None, None, "", False]
 
     # Boolean to say when testController is running the quick test
     testOne = False
-
-    # This is a list of pointers which I use so that the fields in the above list
-    # are named rather than numbered
-    ipAddress = 0
-    ipPort = 1
-    duty = 2
-    state = 3                       # -1 Need to create a socket object when time is right
-                                    # 0  Need to attempt a connect when the time is right
-                                    # 1  We're connected, need to get on with it
-    handle = 4
-    connect = 5
-    RxDBuffer = 6
-    gotStart = 7
 
     # The delay between attempts to create a connection to each port
     connectDwell = 5

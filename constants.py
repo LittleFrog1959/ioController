@@ -46,3 +46,23 @@ class constants ():
     # Number of colomns on the rowsIO page
     fCount = 5
 
+    # Name of the file which is used by the ioControler to sort out the
+    # deviceIOPage
+    deviceIOFilename = 'deviceIO.txt'
+
+    # This is a list of pointers which I use so that the fields in g.tcpList
+    # are named rather than numbered
+    ipAddress = 0
+    ipPort = 1
+    duty = 2
+    state = 3
+    handle = 4
+    connect = 5
+    RxDBuffer = 6
+    gotStart = 7
+
+    # In the above list, see "state", well here are the states you can have;
+    createSocket = -1               # Need to create a socket object when time is right
+    connectSocket = 0               # Need to attempt a connect when the time is right
+    doComms = 1                     # We're connected, need to get on with it
+

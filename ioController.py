@@ -100,12 +100,12 @@ class sampleApp (tk.Tk):
         container. grid_columnconfigure (0, weight = 1)
 
         self.frames = {}
-        for F in (rowIOPage, mainPage, messagePage):
+        for F in (deviceIOPage, gridIOPage, messagePage):
             page_name = F.__name__
             frame = F (parent = container, controller = self)
             self.frames [page_name] = frame
             frame.grid (row = 0, column = 0, sticky = 'nsew')
-        self.show_frame ('mainPage')
+        self.show_frame ('gridIOPage')
 
     def show_frame (self, page_name):
         frame = self.frames [page_name]
@@ -121,14 +121,26 @@ class messagePage (tk.Frame):
         self.msgText.pack (anchor = 'nw', expand = True, fill = 'both')
 #        self.msgText.pack (anchor = 'nw', expand = True, fill = tk.X)
 
-        self.button = tk.Button(self, text='I/O',
-                   command=lambda: controller.show_frame('mainPage'))
-        self.button.pack()
+        self.button = tk.Button(self, text='Grid I/O', width = 8,  height = 2,
+                   command=lambda: controller.show_frame('gridIOPage'))
+        self.button.pack(side = 'left', padx = 100, pady = 5)
+        self.button = tk.Button(self, text='Device I/O', width = 8, height = 2,
+                   command=lambda: controller.show_frame('deviceIOPage'))
+        self.button.pack(side = 'left')
+        self.button = tk.Button(self, text='Clear', width = 8, height = 2,
+                   command=lambda: self.clearMsgs())
+        self.button.pack(side = 'left', padx = 100)
 
         # Initalise a counter for the number of messages on the screen
         # I only need this because I can't see a way of knowing how many
         # rows of text there are on the screen...  There must be a way??
         self.messageRows = 0
+
+    def clearMsgs (self):
+        # Clear the messages from the screen
+        rowCount = int(self.msgText.index('end-1c').split('.')[0])
+        for self.pointer in range (0, rowCount):
+            self.msgText.delete ('1.0', '2.0')
 
     def addMsg (self, m):
         # Delete the oldest message if we're about to run out of space
@@ -141,27 +153,24 @@ class messagePage (tk.Frame):
         # Print the message to the text box
         self.msgText.insert (tk.END, m + '\n')
 
-class rowIOPage(tk.Frame):
+class deviceIOPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.controller = controller
 
         # First create a frame to hold the exit buttons at the bottom of the page
         self.bottomFrame = tk.Frame (self)
-#        self.bottomFrame.pack (side = tk.BOTTOM, expand = True)
-        self.bottomFrame.pack (side = tk.BOTTOM)
+        self.bottomFrame.pack (side = tk.BOTTOM, fill = tk.X)
 
         # Create a canvas within which all one big frame and the context menus will be presented
         self.canvas = tk.Canvas (self)
 
         # And then within that canvas, create a frame which will hold the columns of buttons
         self.bigFrame = tk.Frame (self.canvas)
-#        self.bigFrame.place (x = 1, y = 1)
-        self.bigFrame.pack (side = tk.LEFT, expand = True)
         self.bigFrame.pack (side = tk.LEFT)
 
         # Now create one scroll bar that will make the whole frame go up and down the screen
-        self.sb = tk.Scrollbar (self, orient = 'vertical', command = self.canvas.yview)
+        self.sb = tk.Scrollbar (self, orient = 'vertical', command = self.canvas.yview, width = 30)
         self.canvas.configure (yscrollcommand = self.sb.set)
         self.sb.pack (side = 'right', fill = 'y')
         self.canvas.pack (side = 'left')
@@ -207,7 +216,30 @@ class rowIOPage(tk.Frame):
 
         # Read the specification file and populate the input and output
         # button lists as we go
-        self.fHandle = open ('rowIO.txt', 'r')
+        self.loadDeviceIOPage ()
+
+        button = tk.Button(self.bottomFrame, text= 'Grid I/O', width = 8, height = 2,
+                        command=lambda: controller.show_frame('gridIOPage'))
+        button.pack(side = 'left', padx = 100, pady = 5)
+        button = tk.Button(self.bottomFrame, text= 'Messages', width = 8, height = 2,
+                        command=lambda: controller.show_frame('messagePage'))
+        button.pack(side = 'left')
+
+#        # Debug:  Output each of the button lists to see what we built
+#        for entry in self.oRBtn:
+#            print ("output " + str (entry))
+#        for entry in self.iRBtn:
+#            print ("Input  " + str (entry))
+
+    def loadDeviceIOPage (self):
+        try:
+            self.fHandle = open (c.deviceIOFilename, 'r')
+        except Exception as ex:
+            template = 'An exception of type {0} occurred. Arguments:{1!r}'
+            message = template.format(type(ex).__name__, ex.args)
+            l.logMsg (message)
+            return
+
         # Go through each entry in the specification file
         for self.fLine in self.fHandle:
             if self.fLine[0] == 'O':
@@ -220,7 +252,7 @@ class rowIOPage(tk.Frame):
                 # be the current frame.  Note how we add this as a list becuase
                 # in a moment we're going to add the board and pin to this one
                 # pointer entry
-                self.oRBtn [pointer] = [tk.Button (self.fList[fPointer][0], text = 'null', width = 20,
+                self.oRBtn [pointer] = [tk.Button (self.fList[fPointer][0], text = 'null', width = 18,
                                 anchor = 'w', justify = tk.LEFT,
                                 command = lambda x = pointer: self.outputPopUpCallBack (x))]
                 self.oRBtn [pointer][0].pack (padx = 15, pady = 5)
@@ -239,7 +271,7 @@ class rowIOPage(tk.Frame):
                 pointer = len (self.iRBtn) - 1
                 # Create the button in the button list AND have it's parent
                 # be the current frame
-                self.iRBtn [pointer] = [tk.Button (self.fList[fPointer][0], text = 'null', width = 20,
+                self.iRBtn [pointer] = [tk.Button (self.fList[fPointer][0], text = 'null', width = 18,
                                 anchor = 'w', justify = tk.LEFT,
                                 command = lambda x = pointer: self.inputPopUpCallBack (x))]
                 self.iRBtn [pointer][0].pack (padx = 15, pady = 5)
@@ -283,19 +315,6 @@ class rowIOPage(tk.Frame):
 
         self.fHandle.close ()
 
-        button = tk.Button(self.bottomFrame, text='Grid I/O',
-                        command=lambda: controller.show_frame('mainPage'))
-        button.pack()
-        button = tk.Button(self.bottomFrame, text='Messages',
-                        command=lambda: controller.show_frame('messagePage'))
-        button.pack()
-
-#        # Debug:  Output each of the button lists to see what we built
-#        for entry in self.oRBtn:
-#            print ("output " + str (entry))
-#        for entry in self.iRBtn:
-#            print ("Input  " + str (entry))
-
     def scrollFunction (self, event):
         self.canvas.configure (scrollregion = self.canvas.bbox ('all'), width = 1270, height = 710)
 #        self.canvas.configure (scrollregion = self.canvas.bbox ('all'))
@@ -338,32 +357,32 @@ class rowIOPage(tk.Frame):
     def setOutputPinLive (self):
         g.oForce[g.popUpBoard][g.popUpPin] = 'live'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
-        app.frames['mainPage'].updateOutputs ()
+        app.frames['gridIOPage'].updateOutputs ()
 
     def setOutputPinForceOn (self):
         g.oForce[g.popUpBoard][g.popUpPin] = 'force on'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
-        app.frames['mainPage'].updateOutputs ()
+        app.frames['gridIOPage'].updateOutputs ()
 
     def setOutputPinForceOff (self):
         g.oForce[g.popUpBoard][g.popUpPin] = 'force off'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
-        app.frames['mainPage'].updateOutputs ()
+        app.frames['gridIOPage'].updateOutputs ()
 
     def setInputPinLive (self):
         g.iForce[g.popUpBoard][g.popUpPin] = 'live'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
-        app.frames['mainPage'].updateInputs ()
+        app.frames['gridIOPage'].updateInputs ()
 
     def setInputPinForceOn (self):
         g.iForce[g.popUpBoard][g.popUpPin] = 'force on'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
-        app.frames['mainPage'].updateInputs ()
+        app.frames['gridIOPage'].updateInputs ()
 
     def setInputPinForceOff (self):
         g.iForce[g.popUpBoard][g.popUpPin] = 'force off'
         self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
-        app.frames['mainPage'].updateInputs ()
+        app.frames['gridIOPage'].updateInputs ()
 
     def fixPopUpLocation (self):
         # Given the current location of the mouse, fix it so that that
@@ -387,23 +406,23 @@ class rowIOPage(tk.Frame):
 
     def updateInput (self, b, p):
         # Given the board and pin which has changed state, see if it's used on the
-        # rowIO page and if it is, update it
+        # deviceIO page and if it is, update it
         for pin in range (0, len (self.iRBtn)):
             if (self.iRBtn[pin][1] == b) & (self.iRBtn[pin][2] == p):
-                self.iRBtn[pin][0].config (activebackground = app.frames['mainPage'].iBtn[b][p].cget ('activebackground'))
-                self.iRBtn[pin][0].config (highlightbackground = app.frames['mainPage'].iBtn[b][p].cget ('highlightbackground'))
-                self.iRBtn[pin][0].config (background = app.frames['mainPage'].iBtn[b][p].cget ('background'))
-                self.iRBtn[pin][0].config (text = app.frames['mainPage'].iBtn[b][p].cget ('text'))
+                self.iRBtn[pin][0].config (activebackground = app.frames['gridIOPage'].iBtn[b][p].cget ('activebackground'))
+                self.iRBtn[pin][0].config (highlightbackground = app.frames['gridIOPage'].iBtn[b][p].cget ('highlightbackground'))
+                self.iRBtn[pin][0].config (background = app.frames['gridIOPage'].iBtn[b][p].cget ('background'))
+                self.iRBtn[pin][0].config (text = app.frames['gridIOPage'].iBtn[b][p].cget ('text'))
 
     def updateOutput (self, b, p):
         for pin in range (0, len (self.oRBtn)):
             if (self.oRBtn[pin][1] == b) & (self.oRBtn[pin][2] == p):
-                self.oRBtn[pin][0].config (activebackground = app.frames['mainPage'].oBtn[b][p].cget ('activebackground'))
-                self.oRBtn[pin][0].config (highlightbackground = app.frames['mainPage'].oBtn[b][p].cget ('highlightbackground'))
-                self.oRBtn[pin][0].config (background = app.frames['mainPage'].oBtn[b][p].cget ('background'))
-                self.oRBtn[pin][0].config (text = app.frames['mainPage'].oBtn[b][p].cget ('text'))
+                self.oRBtn[pin][0].config (activebackground = app.frames['gridIOPage'].oBtn[b][p].cget ('activebackground'))
+                self.oRBtn[pin][0].config (highlightbackground = app.frames['gridIOPage'].oBtn[b][p].cget ('highlightbackground'))
+                self.oRBtn[pin][0].config (background = app.frames['gridIOPage'].oBtn[b][p].cget ('background'))
+                self.oRBtn[pin][0].config (text = app.frames['gridIOPage'].oBtn[b][p].cget ('text'))
 
-class mainPage(tk.Frame):
+class gridIOPage(tk.Frame):
     def __init__(self, parent, controller):
         # Initalise the basic form we're going to be writing to
         tk.Frame.__init__(self, parent)
@@ -693,9 +712,9 @@ class mainPage(tk.Frame):
                     # Set the state of the input pin...  This does not actually do anything
                     # apart from update the colours of the buttons on the UI
                     self.setInputPin (board, pin)
-                    # Call a method in the rowIOPage to see if this changed pin is
+                    # Call a method in the deviceIOPage to see if this changed pin is
                     # being displayed.  If it is, then update it.
-                    app.frames['rowIOPage'].updateInput (board, pin)
+                    app.frames['deviceIOPage'].updateInput (board, pin)
                     somethingChanged = True
         if somethingChanged == True:
             self.tcpSendIOState ('IO update sent:  Change of input state')
@@ -712,9 +731,9 @@ class mainPage(tk.Frame):
                     # Set the state of the output pin even though it might be the same
                     # (e.g. If the change in text was the pin name)
                     self.setOutputPin (board, pin)
-                    # Call a method in the rowIOPage to see if this changed pin is
+                    # Call a method in the deviceIOPage to see if this changed pin is
                     # being displayed.  If it is, then update it.
-                    app.frames['rowIOPage'].updateOutput(board, pin)
+                    app.frames['deviceIOPage'].updateOutput(board, pin)
                     somethingChanged = True
         if somethingChanged == True:
            self.tcpSendIOState ('IO update sent:  Change of output state')
@@ -963,14 +982,14 @@ class mainPage(tk.Frame):
 
         # Create the buttons that allow movement to other pages
         self.messageBtn = tk.Button (self, text = 'Messages', anchor = 'w', justify = tk.LEFT,
-                            background = c.normalGrey, activebackground = c.brightGrey,
+                            height = 2, background = c.normalGrey, activebackground = c.brightGrey,
                             command = lambda: self.controller.show_frame ('messagePage'))
-        self.messageBtn.grid (row = 12, column = 1, rowspan = 2)
+        self.messageBtn.grid (row = 12, column = 1, rowspan = 3, columnspan = 2)
 
-        self.rowIOBtn = tk.Button (self, text = 'Row IO', anchor = 'w', justify = tk.LEFT,
-                            background = c.normalGrey, activebackground = c.brightGrey,
-                            command = lambda: self.controller.show_frame ('rowIOPage'))
-        self.rowIOBtn.grid (row = 12, column = 3, rowspan =2)
+        self.deviceIOBtn = tk.Button (self, text = 'Device I/O', anchor = 'w', justify = tk.LEFT,
+                            height = 2, background = c.normalGrey, activebackground = c.brightGrey,
+                            command = lambda: self.controller.show_frame ('deviceIOPage'))
+        self.deviceIOBtn.grid (row = 12, column = 3, rowspan = 3, columnspan = 2)
 
         # Create a pop up menu to control the forced state of a selected pin
         self.outputPopUpMenu = tk.Menu (self, tearoff = 0)
@@ -1078,8 +1097,8 @@ class mainPage(tk.Frame):
 
 def closeWindow ():
     # Close down the program
-    app.frames['mainPage'].tcpDataClose ()          # Disconnect and TCP clients if they're connected
-    app.frames['mainPage'].tcpControlClose ()
+    app.frames['gridIOPage'].tcpDataClose ()          # Disconnect and TCP clients if they're connected
+    app.frames['gridIOPage'].tcpControlClose ()
     l.logClose ()                                   # Close the log file
     sys.exit ()                                     # Return to the operating system
 
@@ -1108,10 +1127,10 @@ def main ():
     app.protocol ('WM_DELETE_WINDOW', closeWindow)  # Call this routine when someone exits the program
 
     # Read the IO and update the buttons as required.  Also send TCP output if required.
-    app.frames['mainPage'].readInputs ()
-    app.frames['mainPage'].readOutputs ()
-    app.frames['mainPage'].updateInputs ()
-    app.frames['mainPage'].updateOutputs ()
+    app.frames['gridIOPage'].readInputs ()
+    app.frames['gridIOPage'].readOutputs ()
+    app.frames['gridIOPage'].updateInputs ()
+    app.frames['gridIOPage'].updateOutputs ()
 
     l.logMsg ('')
     l.logMsg ('Starting on-screen message page')
