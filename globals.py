@@ -115,7 +115,9 @@ class testGlobals ():
 
     # Extend the globals to include a list of ports to connect to
     tcpList = ['100', 10000, 'c', c.createSocket, None, None, "", False], \
-              ['100', 10001, 'd', c.createSocket, None, None, "", False]
+              ['100', 10001, 'd', c.createSocket, None, None, "", False], \
+              ['61', 10000, 'c', c.createSocket, None, None, "", False], \
+              ['61', 10001, 'd', c.createSocket, None, None, "", False]
 
     # Boolean to say when testController is running the quick test
     testOne = False

@@ -3,15 +3,18 @@
 # Credits here          https://github.com/LittleFrog1959/ioController/wiki/Credits
 
 import tkinter as tk
-from tkinter import font  as tkfont
 
 import socket
 import os
-import subprocess
 import errno
 import datetime as dt
 import sys
 import time
+
+# From a boot, we need a delay before the program starts running.  This is because I
+# found that without this, sometimes the eth0 port is not running when we start from
+# boot time
+time.sleep (5)
 
 # The AB Electronics driver for the PIO board
 from IOPi import IOPi
@@ -34,26 +37,29 @@ class logClass (logging.log):
         super().__init__ ()
 
     def logMsg (self, message, level = 'debug'):
-        # NOTE:  The max message length is about 130 chars
-        # Form the message then send to the disk log
+        # NOTE:  The max message length is about 130 chars.  Form the message then send
+        #  to the disk log
         m = self.logDiskMsg (message, level)
-        # Send the message to the message text box. At the
-        # moment this will error if a message is produced
-        # before the messagePage is defined so I just
-        # print to the terminal session that started the
-        # program
+        # Send the message to the message text box. At the moment this will error if a
+        # message is produced before the messagePage is defined so I just print to the
+        # terminal session that started theprogram
 
         # Init something to hold the message we're going to print
         wm = None
         while (len (m) >  0):
+
             # Detect first time around the loop
             if wm == None:
-                # Slice off the first lot of chars
+                # Load up the first part of the message and trim the remainder
                 wm = m[0:c.messageColMax]
                 m = m[c.messageColMax:]
+
             else:
+                # We're printing a multi line message to the on-screen text box
+                # so do as above but pad the start of the message with some spaces
                 wm = ' ' * 10 + m[0:c.messageColMax - 10]
                 m = m[c.messageColMax - 10:]
+            # The print could fail if the message page is not initialised yet
             try:
                 app.frames['messagePage'].addMsg (wm)
             except NameError:
@@ -61,11 +67,15 @@ class logClass (logging.log):
                 print (m)
 
     def logClose (self):
+        # Close the disk log because we're shutting down
         self.logDiskClose ()
 
     def logFlush (self):
+        # Flush the disk log to the actual disk.  This makes "tail -F log.log"
+        # work better
         self.logDiskFlush ()
 
+# Now actually define the logging object
 l = logClass ()
 
 class sampleApp (tk.Tk):
@@ -73,41 +83,53 @@ class sampleApp (tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
 
-        # Read if we're connected to the touch screen (:0.0) or some other
+        # Read if we're connected to the touch screen (':0.0' or ':0') or some other
         # screen.  The touch screen uses all the screen space for our application
         # and does not need the mouse.  Other screens don't do touch and so need
-        #the mouse to be working.
+        # the mouse to be working.
         try:
             displayReference = os.environ['DISPLAY']
+
         except KeyError:
             # Could not read DISPLAY value so just proceed with it set to something
             displayReference = None
 
-        if (displayReference == ':0.0'):
-            # If we're running on the touch screen, then set some useful defaults
+        # I don't know why but when the program us auto started, the DISPLAY is ':0'
+        # and when it's run from the command line, it's set to ':0.0' so this
+        # works around that problem
+        if (displayReference == ':0.0') or (displayReference == ':0'):
+            # If we're running on the touch screen, then set the screen size, turn the
+            # mouse off, set it's location  to top left then make sure our window uses
+            # the full screen
             self.geometry (c.touchScreenResolution)
             self.config (cursor = 'none')
+            self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
             self.attributes('-fullscreen', True)
+
         else:
             self.geometry (c.touchScreenResolution)
 
         # Build the frame into which all the page definitions will fit
         container = tk.Frame (self)
-#        container.pack (anchor = 'nw', expand = True, fill = 'both')
-#        container.pack (anchor = 'nw', expand = True, fill = tk.X)
         container.pack (side = 'top', fill = 'both', expand = True)
         container.grid_rowconfigure (0, weight = 1)
         container. grid_columnconfigure (0, weight = 1)
 
+        # Amazing bit of code (see credits) which builds a dictionary of the pages
+        # initialising them as we go
         self.frames = {}
+
         for F in (deviceIOPage, gridIOPage, messagePage):
             page_name = F.__name__
             frame = F (parent = container, controller = self)
             self.frames [page_name] = frame
             frame.grid (row = 0, column = 0, sticky = 'nsew')
+
+        # Select the start up page to display
         self.show_frame ('gridIOPage')
 
     def show_frame (self, page_name):
+        # Switches to the named page
         frame = self.frames [page_name]
         frame.tkraise ()
 
@@ -980,7 +1002,7 @@ class gridIOPage(tk.Frame):
                             command = lambda x = board, y = pin : self.inputPopUpCallBack (x, y))
                 self.iBtn[board][pin].grid(row = board + 7, column = pin + 1)
 
-        # Create the buttons that allow movement to other pages
+        # Create the buttons that allow movement to other pages, reboot and exit
         self.messageBtn = tk.Button (self, text = 'Messages', anchor = 'w', justify = tk.LEFT,
                             height = 2, background = c.normalGrey, activebackground = c.brightGrey,
                             command = lambda: self.controller.show_frame ('messagePage'))
@@ -990,6 +1012,17 @@ class gridIOPage(tk.Frame):
                             height = 2, background = c.normalGrey, activebackground = c.brightGrey,
                             command = lambda: self.controller.show_frame ('deviceIOPage'))
         self.deviceIOBtn.grid (row = 12, column = 3, rowspan = 3, columnspan = 2)
+
+        self.deviceIOBtn = tk.Button (self, text = 'Exit', anchor = 'e', justify = tk.RIGHT,
+                            height = 2, background = c.normalGrey, activebackground = c.brightGrey,
+                            command = lambda: self.exitSoftware ())
+        self.deviceIOBtn.grid (row = 12, column = 13, rowspan = 3, columnspan = 2)
+
+        self.deviceIOBtn = tk.Button (self, text = 'Reboot', anchor = 'e', justify = tk.RIGHT,
+                            height = 2, background = c.normalGrey, activebackground = c.brightGrey,
+                            command = lambda: self.rebootMachine ())
+        self.deviceIOBtn.grid (row = 12, column = 15, rowspan = 3, columnspan = 2)
+
 
         # Create a pop up menu to control the forced state of a selected pin
         self.outputPopUpMenu = tk.Menu (self, tearoff = 0)
@@ -1031,6 +1064,12 @@ class gridIOPage(tk.Frame):
             self.outputPopUpMenu.post (x, y)
         except:
             l.logMsg ('Unknown error while trying to present output pop up menu', level = 'alarm')
+
+    def exitSoftware (self):
+        sys.exit ()
+
+    def rebootMachine (self):
+        os.system ('sudo reboot')
 
     def inputPopUpCallBack (self, b, p):
         # Given the current mouse location, fix the location that the menu will be placed
