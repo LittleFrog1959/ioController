@@ -134,15 +134,20 @@ class sampleApp (tk.Tk):
         frame.tkraise ()
 
 class messagePage (tk.Frame):
+    # This class creates the message page.  This is the simplest of the pages and
+    # simply echos log messages to the screen.
     def __init__(self, parent, controller):
+        # DON'T UNDERSTAND THIS BIT.  It registers the page in the dictionary that
+        # controls the presentation of pages.
         tk.Frame.__init__(self, parent)
         self.controller = controller
 
-        # Put up the message space
+        # Create the text box that will hold the messages
         self.msgText = tk.Text (self)
         self.msgText.pack (anchor = 'nw', expand = True, fill = 'both')
-#        self.msgText.pack (anchor = 'nw', expand = True, fill = tk.X)
 
+        # Create the buttons that allow you to navigate to other pages and clear
+        # the message list
         self.button = tk.Button(self, text='Grid I/O', width = 8,  height = 2,
                    command=lambda: controller.show_frame('gridIOPage'))
         self.button.pack(side = 'left', padx = 100, pady = 5)
@@ -159,24 +164,39 @@ class messagePage (tk.Frame):
         self.messageRows = 0
 
     def clearMsgs (self):
-        # Clear the messages from the screen
+        # Clear the messages from the screen.  Go around a loop deleting the
+        # top message in the text box
         rowCount = int(self.msgText.index('end-1c').split('.')[0])
+
         for self.pointer in range (0, rowCount):
             self.msgText.delete ('1.0', '2.0')
 
     def addMsg (self, m):
         # Delete the oldest message if we're about to run out of space
-        # in the text box.
+        # in the text box and then print the supplied message to the text
+        # box
+         # Bump the number of messages that we've sent to the text box
         self.messageRows += 1
+
+        # If we're going to print off the bottom of the page, delete the
+        # olest message.  Keep the message counter and a sensible value
         if self.messageRows > c.messageRowMax:
             self.messageRows = c.messageRowMax
             # 1.0...  Don't ask... The first row (1) and the first col (0)
             self.msgText.delete ('1.0', '2.0')
+
         # Print the message to the text box
         self.msgText.insert (tk.END, m + '\n')
 
 class deviceIOPage(tk.Frame):
+    # This class creates a funny old page; it reads a text config file and presents
+    # I/O grouped in a way that's useful to the user.  Not sure if this was really
+    # worth the effort, but it's here now...  This class is something of a 'slave' to
+    # the grid I/O page because it assumes that the global lists containing the state
+    # of the I/O are populated elsewhere...  That place is the grid I/O page class
     def __init__(self, parent, controller):
+
+        # I still don't understand this!
         tk.Frame.__init__(self, parent)
         self.controller = controller
 
@@ -199,7 +219,8 @@ class deviceIOPage(tk.Frame):
         self.canvas.create_window ((0, 0), window = self.bigFrame, anchor = 'nw')
         self.bigFrame.bind ('<Configure>', self.scrollFunction)
 
-        # Create a pop up menu to control the forced state of a selected pin
+        # Create a pop up menu to control the forced state of a selected pin.  This was copied
+        # from the grid I/O page
         self.outputPopUpMenu = tk.Menu (self.bigFrame, tearoff = 0)
         self.outputPopUpMenu.config (font = (None, 20))
         self.outputPopUpMenu.add_command (label = 'output')
@@ -218,6 +239,7 @@ class deviceIOPage(tk.Frame):
 
         # Now create the frames that will hold the pins
         self.fList = []
+
         for f in range (0, c.fCount):
             # Add an entry to the end of the list (f points at it)
             self.fList.append (0)
@@ -240,36 +262,42 @@ class deviceIOPage(tk.Frame):
         # button lists as we go
         self.loadDeviceIOPage ()
 
+        # Now create the navigatio buttons that get you to other pages
+
         button = tk.Button(self.bottomFrame, text= 'Grid I/O', width = 8, height = 2,
                         command=lambda: controller.show_frame('gridIOPage'))
         button.pack(side = 'left', padx = 100, pady = 5)
+
         button = tk.Button(self.bottomFrame, text= 'Messages', width = 8, height = 2,
                         command=lambda: controller.show_frame('messagePage'))
         button.pack(side = 'left')
 
-#        # Debug:  Output each of the button lists to see what we built
-#        for entry in self.oRBtn:
-#            print ("output " + str (entry))
-#        for entry in self.iRBtn:
-#            print ("Input  " + str (entry))
-
     def loadDeviceIOPage (self):
+        # This is a bit tricky.  It populates the frames with buttons based on "who's
+        # got the fewest right now".
+
+        # First of all try to open the text file containing the config of the buttons
+        # we want to see and error/exit if it does not exist
         try:
             self.fHandle = open (c.deviceIOFilename, 'r')
+
         except Exception as ex:
             template = 'An exception of type {0} occurred. Arguments:{1!r}'
             message = template.format(type(ex).__name__, ex.args)
             l.logMsg (message)
             return
 
-        # Go through each entry in the specification file
+        # Go through each entry in the specification file seeing if the first char on
+        # the line is an O, I or some other legal value
         for self.fLine in self.fHandle:
             if self.fLine[0] == 'O':
-                # Extract the board and pin
+                # Extract the board and pin from the line of text we're working on
                 self.board, self.pin = self.getBoardnPin (self.fLine)
+
                 # Append an entry to the button list
                 self.oRBtn.append (0)
                 pointer = len (self.oRBtn) - 1
+
                 # Create the button in the button list AND have it's parent
                 # be the current frame.  Note how we add this as a list becuase
                 # in a moment we're going to add the board and pin to this one
@@ -278,6 +306,7 @@ class deviceIOPage(tk.Frame):
                                 anchor = 'w', justify = tk.LEFT,
                                 command = lambda x = pointer: self.outputPopUpCallBack (x))]
                 self.oRBtn [pointer][0].pack (padx = 15, pady = 5)
+
                 # Append two more list items to this entry to save the board and pin
                 self.oRBtn [pointer].append (self.board)
                 self.oRBtn [pointer].append (self.pin)
@@ -288,18 +317,22 @@ class deviceIOPage(tk.Frame):
             elif self.fLine [0] == 'I':
                 # As above for inputs
                 self.board, self.pin = self.getBoardnPin (self.fLine)
+
                 # Append an entry to the button list
                 self.iRBtn.append (0)
                 pointer = len (self.iRBtn) - 1
+
                 # Create the button in the button list AND have it's parent
                 # be the current frame
                 self.iRBtn [pointer] = [tk.Button (self.fList[fPointer][0], text = 'null', width = 18,
                                 anchor = 'w', justify = tk.LEFT,
                                 command = lambda x = pointer: self.inputPopUpCallBack (x))]
                 self.iRBtn [pointer][0].pack (padx = 15, pady = 5)
+
                 # Append two more list items to this entry to save the board and pin
                 self.iRBtn [pointer].append (self.board)
                 self.iRBtn [pointer].append (self.pin)
+
                 # Bump the correct rows used counter
                 self.fList[fPointer][1] += 1
 
@@ -317,6 +350,7 @@ class deviceIOPage(tk.Frame):
                 # Add the title to the correct frame
                 label = tk.Label (self.fList[fPointer][0], text = self.fLine[1:-1])
                 label.pack (side = 'top', anchor = 'w')
+
                 # Bump the correct rows used counter
                 self.fList[fPointer][1] += 1
 
@@ -333,13 +367,16 @@ class deviceIOPage(tk.Frame):
                 # file
                 break
             else:
-                print ('Error')
+                print ('Error in grid I/O specification file')
 
+        # Close the specification file and exit
         self.fHandle.close ()
 
     def scrollFunction (self, event):
+        # Called when someone moves the scroll bar up / down
         self.canvas.configure (scrollregion = self.canvas.bbox ('all'), width = 1270, height = 710)
-#        self.canvas.configure (scrollregion = self.canvas.bbox ('all'))
+
+# GOT TO HERE DAVID!
 
     def outputPopUpCallBack (self, p):
         # Given the current mouse location, fix the location that the menu will be placed
@@ -359,6 +396,7 @@ class deviceIOPage(tk.Frame):
             # on then display the menu
             self.outputPopUpMenu.entryconfigure (0, label = g.oName[g.popUpBoard][g.popUpPin])
             self.outputPopUpMenu.post (x, y)
+
         except:
             l.logMsg ('Unknown error while trying to present output pop up menu', level = 'alarm')
 
