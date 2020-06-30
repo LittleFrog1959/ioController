@@ -185,13 +185,6 @@ def checkKeyboard ():
 
         g.tcpList[0][c.handle].send (sendThis.encode ())
 
-    elif ch == ord ('4'):
-        # Start / stop the test
-        if g.testOne == False:
-            g.testOne = True
-        else:
-            g.testOne = True
-
     elif ch == ord ('5'):
         # Send a syntactically invalid command to the IO Controller
         g.tcpList[0][c.handle].send ('exec lobsters are lovely\r\n'.encode ())
@@ -217,10 +210,6 @@ def stateCreateSocket (pointer):
             template = "An exception of type {0} occurred. Arguments:{1!r}"
             message = template.format(type(ex).__name__, ex.args)
             logMsg (message)
-
-def checkTests ():
-    # Run a test which toggles all the IO as quickly as possible
-    return
 
 def stateConnectClient (pointer):
     if g.tcpList[pointer][c.connect] < dt.datetime.now ():
@@ -262,11 +251,13 @@ def stateConnected (pointer):
     # into a string using default encoding
     try:
         RxD = g.tcpList[pointer][c.handle].recv (1024).decode ()
+
     except socket.error as e:
         err = e.args [0]
         if (err == errno.EAGAIN) or (err == errno.EWOULDBLOCK):
             # Expected error if there's nothing received
             pass
+
     except Exception as ex:
         # Buffer read failed
         logMsg ('Failed read on entry ' + str (pointer))
@@ -281,6 +272,7 @@ def stateConnected (pointer):
         g.tcpList[pointer][c.handle].close ()
         g.tcpList[pointer][c.state] = c.createSocket
         g.tcpList[pointer][c.connect] = dt.datetime.now () + dt.timedelta (seconds = 2)
+
     else:
         # See if we actually got anything in
         if len (RxD) == 0:
@@ -291,14 +283,17 @@ def stateConnected (pointer):
             g.tcpList[pointer][c.handle].close ()
             g.tcpList[pointer][c.state] = c.createSocket
             g.tcpList[pointer][c.connect] = dt.datetime.now () + dt.timedelta (seconds = 2)
+
         else:
             # What ever the port type, append the newly arrived string
             # to the buffer
             g.tcpList[pointer][c.RxDBuffer] = g.tcpList[pointer][c.RxDBuffer] + RxD
+
             if g.tcpList[pointer][c.duty] == 'c':
                 # It's a control port
                 logMsg ('Control port received the following on entry: ' + str (pointer))
                 logMsg (RxD)
+
             elif g.tcpList[pointer][c.duty] == 'd':
                 # It's a data port.  Work out if we have to try to get in sync
                 if g.tcpList[pointer][c.gotStart] == False:
@@ -312,6 +307,7 @@ def stateConnected (pointer):
                 # Now print as many whole lines as we can find in the buffer
                 # and update the remainder (if there is any) back into the buffer
                 g.tcpList[pointer][c.RxDBuffer] = processDataLines (pointer, g.tcpList[pointer][c.RxDBuffer])
+
             else:
                 logMsg ('Invalid port duty on entry ' + str (pointer))
 
@@ -331,23 +327,25 @@ def main (ui, *args):
     # This is the main loop of the program which is basically running around the ports
     # as quickly as possible figuring out what's to do next on each of them
     while (True):
+
         # See if the keyboard has been pressed
         checkKeyboard ()
 
-        # See if we're running a test
-        checkTests ()
-
         # Look at the state of each entry in tcpList
         for pointer in range (0, len (g.tcpList)):
+
             # Are we waiting to create a socket object?
             if g.tcpList[pointer][c.state] == c.createSocket:
                 stateCreateSocket (pointer)
+
             # Are we waiting to connect to the IO Controller?
             elif g.tcpList[pointer][c.state] == c.connectSocket:
                 stateConnectClient (pointer)
+
             # We're connected...
             elif g.tcpList[pointer][c.state] == c.doComms:
                 stateConnected (pointer)
+
             else:
                 logMsg ('Illegal state on entry ' + str (pointer))
 

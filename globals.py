@@ -114,16 +114,14 @@ class testGlobals ():
     tcpAddress = '192.168.1.'
 
     # Extend the globals to include a list of ports to connect to
-    tcpList = ['100', 10000, 'c', c.createSocket, None, None, "", False], \
-              ['100', 10001, 'd', c.createSocket, None, None, "", False], \
-              ['61', 10000, 'c', c.createSocket, None, None, "", False], \
-              ['61', 10001, 'd', c.createSocket, None, None, "", False]
-
-    # Boolean to say when testController is running the quick test
-    testOne = False
-
-    # The delay between attempts to create a connection to each port
-    connectDwell = 5
+    tcpList = ['61', 10000, 'c', c.createSocket, None, None, "", False], \
+              ['61', 10001, 'd', c.createSocket, None, None, "", False], \
+              ['62', 10000, 'c', c.createSocket, None, None, "", False], \
+              ['62', 10001, 'd', c.createSocket, None, None, "", False], \
+              ['63', 10000, 'c', c.createSocket, None, None, "", False], \
+              ['63', 10001, 'd', c.createSocket, None, None, "", False], \
+              ['64', 10000, 'c', c.createSocket, None, None, "", False], \
+              ['64', 10001, 'd', c.createSocket, None, None, "", False]
 
     # Create a list which is made up of a class called "testGlobals" found in the
     # globals module.  There's one of these for each entry in tcpList
