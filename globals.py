@@ -129,3 +129,5 @@ class testGlobals ():
     for pointer in range (0, len (tcpList)):
         ioData.append (ioInformation ())
 
+    # Points to the current IO Controller
+    currentIOController = 0

@@ -66,3 +66,5 @@ class constants ():
     connectSocket = 0               # Need to attempt a connect when the time is right
     doComms = 1                     # We're connected, need to get on with it
 
+    # The max IO controller number starting from zero
+    maxIOController = 3

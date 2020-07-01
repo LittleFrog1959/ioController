@@ -50,41 +50,36 @@ def printRow (pr, rowList):
         ui.addstr (pr, pointer * 8, rowList [pointer])
         ui.clrtoeol ()
 
-def printLists (pointer):
+def printLists ():
     # Print nicely formated lists that should have been loaded by the exec command in printLine
     # Start of the table to get out of the way of the raw text printout
-    lRow = 1 + (pointer * 8)
-    ui.addstr (lRow, 0, 'g.iBoards ' + str (g.ioData[pointer].iBoards))
-    ui.addstr (lRow, 20, 'g.oBoards ' + str (g.ioData[pointer].oBoards))
-
-    # Toggle the state of the on-screen activity indicator
-    if g.toggle == False:
-        ui.addstr (lRow, 40, ' ')
-        g.toggle = True
-    else:
-        ui.addstr (lRow, 40, '*')
-        g.toggle = False
+    lRow = 1
+    ui.addstr (lRow, 0, 'Output boards ' + str (g.ioData[g.currentIOController].oBoards))
+    ui.addstr (lRow, 20, 'Input boards ' + str (g.ioData[g.currentIOController].iBoards))
+    ui.addstr (lRow, 40, 'Current IO Controller ' + str (g.currentIOController))
 
     ui.clrtoeol ()
     lRow += 1
+    return
+
     # Single loop to print all the output information
-    for ptr in range (0, g.ioData[pointer].oBoards):
-        printRow (lRow + 0, g.ioData[pointer].oState[ptr])
-        printRow (lRow + 1, g.ioData[pointer].oForce[ptr])
-        printRow (lRow + 2, g.ioData[pointer].oName[ptr])
+    for pointer in range (0, g.ioData[g.currentIOController].oBoards):
+        printRow (lRow + 0, g.ioData[g.currentIOController].oState[pointer])
+        printRow (lRow + 1, g.ioData[g.currentIOController].oForce[pointer])
+        printRow (lRow + 2, g.ioData[g.currentIOController].oName[pointer])
         lRow += 3
 
     # Single loop to print all the input information
-    for ptr in range (0, g.ioData[pointer].iBoards):
-        printRow (lRow + 0, g.ioData[pointer].iState[ptr])
-        printRow (lRow + 1, g.ioData[pointer].iForce[ptr])
-        printRow (lRow + 2, g.ioData[pointer].iName[ptr])
+    for pointer in range (0, g.ioData[g.currentIOController].iBoards):
+        printRow (lRow + 0, g.ioData[g.currentIOController].iState[pointer])
+        printRow (lRow + 1, g.ioData[g.currentIOController].iForce[pointer])
+        printRow (lRow + 2, g.ioData[g.currentIOController].iName[pointer])
         lRow += 3
 
     ui.refresh ()
 
 def addChannel (pointer, lineOfText):
-    # Remove the leading g and replace it with g.ioData[pointer]
+    # Remove the leading g and replace it with g.ioData[g.currentIOController]
     return 'g.ioData[' + str (pointer) + ']' + lineOfText[1:]
 
 def processDataLines (pointer, m):
@@ -133,7 +128,7 @@ def processDataLines (pointer, m):
         # If we're processing iBoards and we already have valid entries for it and oBoards
         # Then we must be at the start of a frame of data values so print them to the screen
         if (lineOfText.find ('g.iName [3]') == 0) & (g.ioData[pointer].iBoards != None) & (g.ioData[pointer].oBoards != None):
-            printLists (pointer)
+            printLists ()
 
         # Now trim off what we just printed remembering that it's \r\n at the
         # end of the line
@@ -188,6 +183,18 @@ def checkKeyboard ():
     elif ch == ord ('5'):
         # Send a syntactically invalid command to the IO Controller
         g.tcpList[0][c.handle].send ('exec lobsters are lovely\r\n'.encode ())
+
+    elif ch == ord ('+'):
+        # Increment the current IO Controller we're looking at
+        g.currentIOController += 1
+        if g.currentIOController > c.maxIOController:
+            g.currentIOController = 0
+
+    elif ch == ord ('-'):
+        # Decrement the current IO controller we're looking at
+        g.currentIOController -= 1
+        if g.currentIOController < 0:
+            g.currentIOController = c.maxIOController
 
 def stateCreateSocket (pointer):
     # Is it time to create a socket object?

@@ -103,7 +103,6 @@ class sampleApp (tk.Tk):
             # the full screen
             self.geometry (c.touchScreenResolution)
             self.config (cursor = 'none')
-            self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
             self.attributes('-fullscreen', True)
 
         else:
@@ -132,6 +131,7 @@ class sampleApp (tk.Tk):
         # Switches to the named page
         frame = self.frames [page_name]
         frame.tkraise ()
+        self.event_generate ('<Motion>', warp = True, x = 0, y = 0)
 
 class messagePage (tk.Frame):
     # This class creates the message page.  This is the simplest of the pages and
@@ -285,6 +285,7 @@ class deviceIOPage(tk.Frame):
             template = 'An exception of type {0} occurred. Arguments:{1!r}'
             message = template.format(type(ex).__name__, ex.args)
             l.logMsg (message)
+            print (message)
             return
 
         # Go through each entry in the specification file seeing if the first char on
