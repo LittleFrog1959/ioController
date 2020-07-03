@@ -740,9 +740,9 @@ class gridIOPage(tk.Frame):
             # Now populate the global iState
             for pin in range (0, c.pinsPerBoard):
                 if (pow (2, pin) & image) != 0:
-                    g.iState[board][pin] = 'off'
+                    g.iState[board][pin] = 'off1'
                 else:
-                    g.iState[board][pin] = 'on'
+                    g.iState[board][pin] = 'on1'
 
     def readOutputs (self):
         # See notes on "readInputs" above. This does the same for the outputs
@@ -751,9 +751,9 @@ class gridIOPage(tk.Frame):
             image = image + self.oObj[board].read_port (0)
             for pin in range (0, c.pinsPerBoard):
                 if (pow (2, pin) & image) != 0:
-                    g.oState[board][pin] = 'on'
+                    g.oState[board][pin] = 'on1'
                 else:
-                    g.oState[board][pin] = 'off'
+                    g.oState[board][pin] = 'off1'
 
     def updateInputs (self):
         # Refresh the on-screen state of the inputs if we need to
@@ -813,7 +813,7 @@ class gridIOPage(tk.Frame):
             self.oBtn[bOput][pOput].config (activebackground = c.brightGrey)
             self.oBtn[bOput][pOput].config (highlightbackground = 'blue')
         elif (g.oForce[bOput][pOput] == 'live'):
-            if (g.oState[bOput][pOput] == 'on'):
+            if (g.oState[bOput][pOput] == 'on1'):
                 self.oObj[bOput].write_pin (pOput + 1, 1)
                 self.oBtn[bOput][pOput].config (bg = 'red3')
                 self.oBtn[bOput][pOput].config (activebackground = 'red')
@@ -838,7 +838,7 @@ class gridIOPage(tk.Frame):
             self.iBtn[bOput][pOput].config (activebackground = c.brightGrey)
             self.iBtn[bOput][pOput].config (highlightbackground = 'blue')
         elif (g.iForce[bOput][pOput] == 'live'):
-            if (g.iState[bOput][pOput] == 'on'):
+            if (g.iState[bOput][pOput] == 'on1'):
                 self.iBtn[bOput][pOput].config (bg = 'red3')
                 self.iBtn[bOput][pOput].config (activebackground = 'red')
                 self.iBtn[bOput][pOput].config (highlightbackground = c.normalGrey)
@@ -942,6 +942,7 @@ class gridIOPage(tk.Frame):
 
             for board in range (0, len (g.oState)):
                 self.dataClient.send (('g.oState [' + str (board) + '] = ' + str (g.oState[board]) + '\r\n').encode ())
+#                l.logMsg ('g.oState [' + str (board) + '] = ' + str (g.oState[board]) + '\r\n')
             for board in range (0, len (g.oForce)):
                 self.dataClient.send (('g.oForce [' + str (board) + '] = ' + str (g.oForce[board]) + '\r\n').encode ())
             for board in range (0, len (g.oName)):

@@ -60,11 +60,22 @@ class constants ():
     connect = 5
     RxDBuffer = 6
     gotStart = 7
+    systemName = 8
+    timer = 9
+    lastDT = 10
+
+    # Titles of the above fields used to label up a nice table
+    tcpListTitles = ['Address', 'Port', 'Duty', 'State', 'Handle', 'Connect', 'RxDBuffer', 'Got Start', 'System Name', 'Timer', 'Last DT']
 
     # In the above list, see "state", well here are the states you can have;
     createSocket = -1               # Need to create a socket object when time is right
     connectSocket = 0               # Need to attempt a connect when the time is right
     doComms = 1                     # We're connected, need to get on with it
 
-    # The max IO controller number starting from zero
-    maxIOController = 3
+    # The timeout when we attemp a TCP connect with the servers (i.e. IO controllers)
+    connectTimeout = 0.5
+
+    # Operation codes for findNextDataPort
+    firstEntry = 0
+    nextEntry = 1
+    previousEntry = 2

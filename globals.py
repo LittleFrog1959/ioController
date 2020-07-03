@@ -72,41 +72,26 @@ class ioGlobals ():
 # very much like the IO Controller end but the massive lists describing
 # the state of the IO have another dimension to them...  Which controller
 # they relate to...
+# Notice how we create the entries as empty strings...  They get populated
+# when there's been a sucsessful connect to the IO Controller.
 class ioInformation ():
-    iBoards = None
-    oBoards = None
+    def __init__ (self):
+        self.iBoards = None
+        self.oBoards = None
 
-    oState = []
-    oldoBtnText = []
-    oForce = []
-    oName = []
-    for board in range (0, len(c.oBoard)):
-        # Create a new row (which is the "board" axis)
-        oState.append ([])
-        oldoBtnText.append ([])
-        oForce.append ([])
-        oName.append ([])
-        # Then populate each row with 16 values (for pin 0-15)
-        for pin in range (0, c.pinsPerBoard):
-            oState[board].append ('null')
-            oldoBtnText[board].append ('')
-            oForce[board].append ('live')
-            oName[board].append ('O' + str (board) + ',' + str (pin))
+        self.oState = []
+        self.oldoBtnText = []
+        self.oForce = []
+        self.oName = []
+        # We don't populate each of the above with the correct number of boards
+        # because this happens in testController when it's learned the number
+        # of boards fitted (from self.iBoards and self.oBoards)
 
-    iState = []
-    oldiBtnText = []
-    iForce = []
-    iName = []
-    for board in range (0, len(c.iBoard)):
-        iState.append ([])
-        oldiBtnText.append ([])
-        iForce.append ([])
-        iName.append ([])
-        for pin in range (0, c.pinsPerBoard):
-            iState[board].append ('null')
-            oldiBtnText[board].append ('')
-            iForce[board].append ('live')
-            iName[board].append ('I' + str (board) + ',' + str (pin))
+        self.iState = []
+        self.oldiBtnText = []
+        self.iForce = []
+        self.iName = []
+        # See note above
 
 class testGlobals ():
     # The first part of the network address, leaving the subnet part to the list
@@ -114,14 +99,14 @@ class testGlobals ():
     tcpAddress = '192.168.1.'
 
     # Extend the globals to include a list of ports to connect to
-    tcpList = ['61', 10000, 'c', c.createSocket, None, None, "", False], \
-              ['61', 10001, 'd', c.createSocket, None, None, "", False], \
-              ['62', 10000, 'c', c.createSocket, None, None, "", False], \
-              ['62', 10001, 'd', c.createSocket, None, None, "", False], \
-              ['63', 10000, 'c', c.createSocket, None, None, "", False], \
-              ['63', 10001, 'd', c.createSocket, None, None, "", False], \
-              ['64', 10000, 'c', c.createSocket, None, None, "", False], \
-              ['64', 10001, 'd', c.createSocket, None, None, "", False]
+    tcpList = ['61', 10000, 'c', c.createSocket, None, None, "", False, 'IO101', None, None], \
+              ['61', 10001, 'd', c.createSocket, None, None, "", False, 'IO101', None, None], \
+              ['62', 10000, 'c', c.createSocket, None, None, "", False, 'IO702', None, None], \
+              ['62', 10001, 'd', c.createSocket, None, None, "", False, 'IO702', None, None], \
+              ['63', 10000, 'c', c.createSocket, None, None, "", False, 'IO133', None, None], \
+              ['63', 10001, 'd', c.createSocket, None, None, "", False, 'IO133', None, None], \
+              ['64', 10000, 'c', c.createSocket, None, None, "", False, 'IO234', None, None], \
+              ['64', 10001, 'd', c.createSocket, None, None, "", False, 'IO234', None, None]
 
     # Create a list which is made up of a class called "testGlobals" found in the
     # globals module.  There's one of these for each entry in tcpList
@@ -129,5 +114,7 @@ class testGlobals ():
     for pointer in range (0, len (tcpList)):
         ioData.append (ioInformation ())
 
-    # Points to the current IO Controller
-    currentIOController = 0
+    # Points to the current Data Port in tcpList above.  Note that this is a pointer
+    # it's not the actual Data Port so depending on the layout of tcpList, it could be
+    # a bit confusing...
+    currentDataPort = 0
