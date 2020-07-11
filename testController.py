@@ -12,6 +12,7 @@ import socket
 import time
 import datetime as dt
 import errno
+import os
 
 import globals
 g = globals.testGlobals ()
@@ -84,7 +85,8 @@ def printTCPList ():
                     field = str (field)[5:]
             elif col == c.lastDT:
                 # Print the last part of the dt
-                field = str (field)[17:]
+                if field != None:
+                    field = str (field)[17:]
             else:
                 field = 'Illegal field'
             ui.addstr (row + 1, col * 14, str (field)[0:13])
@@ -274,10 +276,12 @@ def checkKeyboard ():
     elif ch == ord ('+'):
         # Increment the current IO Controller we're looking at
         findNextDataPort (c.nextEntry)
+        printLists ()
 
     elif ch == ord ('-'):
         # Decrement the current IO controller we're looking at
         findNextDataPort (c.previousEntry)
+        printLists ()
 
 def findNextDataPort (direction):
     # OK, this is simple once you've got your head around it.  We have a list called tcpList
@@ -508,6 +512,17 @@ def main (ui, *args):
                 logMsg (pointer, 'Illegal state')
 
 if __name__ == "__main__":
+    # Before we try to start a curses session, check that the terminal is big enough
+    cols, rows = os.get_terminal_size ()
+    if (cols < c.tcCols) or (rows < c.tcRows):
+        print ("Can't start program as terminal is only;")
+        print ("rows = " + str (rows))
+        print ("cols = " + str (cols))
+        print ("And it needs to be;")
+        print ("rows = " + str (c.tcRows))
+        print ("cols = " + str (c.tcCols))
+        sys.exit ()
+
     # Create a screen device which does not echo keypresses to the screen
     # or wait for ENTER before returning keystrokes then call our application
     # in a way that makes the terminal recover if the program crashes

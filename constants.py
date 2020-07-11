@@ -79,3 +79,7 @@ class constants ():
     firstEntry = 0
     nextEntry = 1
     previousEntry = 2
+
+    # Minimum screen size for Test Controller UI
+    tcRows = 40
+    tcCols = 150
