@@ -188,8 +188,14 @@ def processDataLines (pointer, m):
             # It is only safe to exec general lines of output once iBoards and oBoards
             # are populated
             # Under these circumstances, don't keep exec-ing the i/oBoard statements
+            # and don't attempt to exec an End of update message
             if (lineOfText.find ('g.iBoards = ') == -1) & (lineOfText.find ('g.oBoards = ') == -1):
-                exec (addChannel (pointer, lineOfText))
+                if (lineOfText.find ('End of update') != 0):
+#                    logMsg (pointer, str (lineOfText))
+#                    logMsg (pointer, str (lineOfText.find ('End of update')))
+                    exec (addChannel (pointer, lineOfText))
+#                else:
+#                    logMsg (pointer, "Passing over end of update")
 #            else:
 #                logMsg (pointer, 'Passing over i/oBoards exec')
         else:
@@ -201,7 +207,7 @@ def processDataLines (pointer, m):
         # If we're processing the last line of text for a given IO Controller and we have valid
         # settings for oBoards and iBoards AND the connection we're servicing is the displayed
         # system then print it all out
-        if (lineOfText.find ('g.iName [3]') == 0) & \
+        if (lineOfText.find ('End of update') == 0) & \
                 (g.ioData[pointer].iBoards != None) & \
                 (g.ioData[pointer].oBoards != None):
             # Work out how long it is since the last time we read from this IO Controller

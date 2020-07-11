@@ -955,6 +955,8 @@ class gridIOPage(tk.Frame):
             for board in range (0, len (g.iName)):
                 self.dataClient.send (('g.iName [' + str (board) + '] = ' + str (g.iName[board]) + '\r\n').encode ())
 
+            self.dataClient.send (('End of update\r\n').encode ())
+
     def refreshToggle (self):
         # Only keep the test running after this go if the test is still
         # enabled.

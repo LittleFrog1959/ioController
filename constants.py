@@ -5,8 +5,10 @@ class constants ():
     pinsPerBoard = 16
 
     # A pair lists describing the I2C ports used by the I/O boards
-    oBoard = [0x20, 0x22, 0x24, 0x26]
-    iBoard = [0x21, 0x23, 0x25, 0x27]
+    oBoard = [0x20, 0x22, 0x24]
+    iBoard = [0x21, 0x23, 0x25]
+#    oBoard = [0x20, 0x22, 0x24, 0x26]
+#    iBoard = [0x21, 0x23, 0x25, 0x27]
 
     # The directory into which we put run time log files
     logDirectory = 'logs/'
