@@ -282,11 +282,15 @@ def checkKeyboard ():
     elif ch == ord ('+'):
         # Increment the current IO Controller we're looking at
         findNextDataPort (c.nextEntry)
+        # Clear screen and then print the new IO information
+        ui.clear ()
         printLists ()
 
     elif ch == ord ('-'):
         # Decrement the current IO controller we're looking at
         findNextDataPort (c.previousEntry)
+        # Clear screen and then print the new IO information
+        ui.clear ()
         printLists ()
 
 def findNextDataPort (direction):
