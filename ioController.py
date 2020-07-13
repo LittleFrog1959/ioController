@@ -1055,6 +1055,11 @@ class gridIOPage(tk.Frame):
                             command = lambda: self.controller.show_frame ('deviceIOPage'))
         self.deviceIOBtn.grid (row = 12, column = 3, rowspan = 3, columnspan = 2)
 
+        self.deviceIOBtn = tk.Button (self, text = 'Update', anchor = 'e', justify = tk.RIGHT,
+                            height = 2, background = c.normalGrey, activebackground = c.brightGrey,
+                            command = lambda: self.updateAndReboot ())
+        self.deviceIOBtn.grid (row = 12, column = 11, rowspan = 3, columnspan = 2)
+
         self.deviceIOBtn = tk.Button (self, text = 'Shutdown', anchor = 'e', justify = tk.RIGHT,
                             height = 2, background = c.normalGrey, activebackground = c.brightGrey,
                             command = lambda: self.shutdown ())
@@ -1111,6 +1116,9 @@ class gridIOPage(tk.Frame):
             self.outputPopUpMenu.post (x, y)
         except:
             l.logMsg ('Unknown error while trying to present output pop up menu', level = 'alarm')
+
+    def updateAndReboot (self):
+        os.system ('./updateAndReboot.sh')
 
     def exitSoftware (self):
         sys.exit ()
