@@ -21,6 +21,10 @@ class constants ():
     # can always go to a fixed place when looking for the latest log
     symbolicLogFilename = 'log.log'
 
+    # The filename that we direct the Git version number to when the program
+    # starts
+    versionNumberFile = 'version.txt'
+
     # Max age of log files in minutes.  Anything older than this is
     # deleted when the program starts.  This purge does NOT happen
     # when the program's running

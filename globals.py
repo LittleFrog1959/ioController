@@ -10,6 +10,9 @@ class ioGlobals ():
     # starts
     ioIPAddress = None
 
+    # Will hold the version number of the software
+    versionNumber = 'No version number'
+
     # The number of messages sent to the messagePage.  This is used to
     # cause a simple scroll of the text widget (i.e. The oldest msg deleted)
     messageRows = 0

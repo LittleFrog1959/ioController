@@ -1044,6 +1044,10 @@ class gridIOPage(tk.Frame):
                             command = lambda x = board, y = pin : self.inputPopUpCallBack (x, y))
                 self.iBtn[board][pin].grid(row = board + 7, column = pin + 1)
 
+        # Present the version number of the software
+        self.label = tk.Label (self, text = g.versionNumber)
+        self.label.grid (row = 12, column = 7, rowspan = 3, columnspan = 2)
+
         # Create the buttons that allow movement to other pages, reboot and exit
         self.messageBtn = tk.Button (self, text = 'Messages', anchor = 'w', justify = tk.LEFT,
                             height = 2, background = c.normalGrey, activebackground = c.brightGrey,
@@ -1216,9 +1220,48 @@ def testOKToRun ():
         print ('No X Display accociated with this terminal session so program cannot run')
         sys.exit (1)
 
+def getVersionNumber ():
+    # Do a simple git command and send the output to a file.  Use that file to populate the
+    # version number.  Set the version number using the following;
+    #   git tag -a V1.0 -m 'Version 1.0'
+    # Then push that change using;
+    #   git push --tags
+    try:
+        os.remove (c.versionNumberFile)
+    except:
+        # For the moment, just ignore an error
+        pass
+
+    try:
+        # Try to do the command which gets the version and send it to the file
+        os.system ('git describe --tags --long > ' + c.versionNumberFile)
+    except Exception as ex:
+        template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
+        message = template.format(type(ex).__name__, ex.args)
+        l.logMsg (message)
+        g.versionNumber = 'Could not complete version read'
+    # Now read the file
+    try:
+        fd = open (c.versionNumberFile, 'r')
+        # Load up the version number and remove the trailing New Line
+        g.versionNumber = fd.read ()[:-1]
+        fd.close ()
+        l.logMsg ('Version number ' + g.versionNumber)
+    except Exception as ex:
+        fd.close ()
+        template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
+        message = template.format(type(ex).__name__, ex.args)
+        l.logMsg (message)
+        g.versionNumber = 'Could not read version file'
+    return
+
 def main ():
     # Work out if the program is already running and exit if it is
     testOKToRun ()
+
+    # Try to get the version number of the program we're running.  This will populate g.versionNumber
+    getVersionNumber ()
+
     global app
     app = sampleApp ()                              # Set up the TK environment
     app.protocol ('WM_DELETE_WINDOW', closeWindow)  # Call this routine when someone exits the program
