@@ -1058,7 +1058,7 @@ class gridIOPage(tk.Frame):
         self.deviceIOBtn = tk.Button (self, text = 'Update', anchor = 'e', justify = tk.RIGHT,
                             height = 2, background = c.normalGrey, activebackground = c.brightGrey,
                             command = lambda: self.updateAndReboot ())
-        self.deviceIOBtn.grid (row = 12, column = 11, rowspan = 3, columnspan = 2)
+        self.deviceIOBtn.grid (row = 12, column = 9, rowspan = 3, columnspan = 2)
 
         self.deviceIOBtn = tk.Button (self, text = 'Shutdown', anchor = 'e', justify = tk.RIGHT,
                             height = 2, background = c.normalGrey, activebackground = c.brightGrey,
